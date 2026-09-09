@@ -315,7 +315,7 @@ static int matchtoken(const unsigned char **pp, const unsigned char **sp)
 }
 
 /* Iterative greedy match with single-point backtracking on the most
- * recent '*', linear in pattern and string length. */
+ * recent '*'. Bounded by pattern length times string length. */
 static int loop(const unsigned char *pattern, const unsigned char *string)
 {
   const unsigned char *p = pattern;
