@@ -181,7 +181,6 @@ static CURLcode global_init(long flags, bool memoryfuncs)
     goto fail;
   }
 
-  /* after Curl_ssl_init(), it may use the TLS backend for randomness */
   Curl_hash_global_init();
 
   if(!Curl_vquic_init()) {

@@ -418,7 +418,7 @@ void Curl_hash_global_init(void)
   static bool seeded;
   unsigned char buf[sizeof(hash_seed)];
 
-  if(seeded) /* existing tables must keep their seed */
+  if(seeded)
     return;
   seeded = TRUE;
 
