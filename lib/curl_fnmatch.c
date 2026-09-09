@@ -248,10 +248,7 @@ fail:
   return SETCHARSET_FAIL;
 }
 
-/* Match the single pattern token at *pp (neither '*' nor '\0') against the
- * string character at *sp (guaranteed non-'\0'). On a match, advance *pp
- * and *sp past the token and the character and return 1. Return 0 for a
- * mismatch, or -1 if the token is a syntactically invalid [...] set. */
+/* match one pattern token against one string character, advancing both */
 static int matchtoken(const unsigned char **pp, const unsigned char **sp)
 {
   const unsigned char *p = *pp;
@@ -314,8 +311,7 @@ static int matchtoken(const unsigned char **pp, const unsigned char **sp)
   return 1;
 }
 
-/* Iterative greedy match with single-point backtracking on the most
- * recent '*'. Bounded by pattern length times string length. */
+/* greedy match with backtracking to the most recent '*' */
 static int loop(const unsigned char *pattern, const unsigned char *string)
 {
   const unsigned char *p = pattern;
