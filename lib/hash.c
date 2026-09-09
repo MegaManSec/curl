@@ -26,6 +26,7 @@
 #include <stddef.h> /* for offsetof() */
 
 #include "hash.h"
+#include "rand.h"
 
 /* random patterns for API verification */
 #ifdef DEBUGBUILD
@@ -409,11 +410,24 @@ void Curl_hash_clean_with_criterium(struct Curl_hash *h, void *user,
   }
 }
 
+static size_t hash_seed(void)
+{
+  static size_t seed;
+  static bool seeded;
+  if(!seeded) {
+    unsigned char buf[sizeof(seed)];
+    if(!Curl_rand(NULL, buf, sizeof(buf)))
+      memcpy(&seed, buf, sizeof(buf));
+    seeded = TRUE;
+  }
+  return seed;
+}
+
 size_t Curl_hash_str(const void *key, size_t key_length, size_t slots_num)
 {
   const char *key_str = (const char *)key;
   const char *end = key_str + key_length;
-  size_t h = 5381;
+  size_t h = 5381 ^ hash_seed();
 
   while(key_str < end) {
     size_t j = (size_t)*key_str++;
