@@ -168,6 +168,10 @@ static void cf_ngtcp2_upd_rx_win(struct Curl_cfilter *cf,
   struct cf_ngtcp2_ctx *ctx = cf->ctx;
   uint64_t cur_win, wanted_win = H3_STREAM_WINDOW_SIZE_MAX;
 
+  /* transfer paused, do not extend the window further */
+  if(Curl_xfer_write_is_paused(data))
+    return;
+
   /* how much does rate limiting allow us to acknowledge? */
   if(Curl_rlimit_active(&data->progress.dl.rlimit)) {
     int64_t avail;
