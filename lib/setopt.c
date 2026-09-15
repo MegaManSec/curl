@@ -2280,6 +2280,13 @@ static CURLcode setopt_cptr_net(struct Curl_easy *data, CURLoption option,
   }
 }
 
+static bool contains_crlf(const char *str)
+{
+  if(str && strpbrk(str, "\r\n"))
+    return TRUE;
+  return FALSE;
+}
+
 static CURLcode setopt_cptr_misc(struct Curl_easy *data, CURLoption option,
                                  char *ptr)
 {
@@ -2417,10 +2424,16 @@ static CURLcode setopt_cptr_misc(struct Curl_easy *data, CURLoption option,
     return Curl_setstropt(data, STRING_SASL_AUTHZID, ptr);
 #ifndef CURL_DISABLE_RTSP
   case CURLOPT_RTSP_SESSION_ID:
+    if(contains_crlf(ptr))
+      return CURLE_BAD_FUNCTION_ARGUMENT;
     return Curl_setstropt(data, STRING_RTSP_SESSION_ID, ptr);
   case CURLOPT_RTSP_STREAM_URI:
+    if(contains_crlf(ptr))
+      return CURLE_BAD_FUNCTION_ARGUMENT;
     return Curl_setstropt(data, STRING_RTSP_STREAM_URI, ptr);
   case CURLOPT_RTSP_TRANSPORT:
+    if(contains_crlf(ptr))
+      return CURLE_BAD_FUNCTION_ARGUMENT;
     return Curl_setstropt(data, STRING_RTSP_TRANSPORT, ptr);
   case CURLOPT_INTERLEAVEDATA:
     s->rtp_out = ptr;
