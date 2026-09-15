@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+socketpair
+</keywords>
+</info>
+
+# Client-side
+<client>
+<features>
+unittest
+</features>
+<name>
+verify_nonce() fails promptly on a peer EOF instead of spinning forever
+</name>
+
+</client>
+</testcase>

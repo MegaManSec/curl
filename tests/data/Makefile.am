@@ -1786,6 +1786,7 @@ TESTCASES = \
   test1959 \
   test1960 \
   test1961 \
+  test1962 \
   \
   test1964 \
   test1965 \

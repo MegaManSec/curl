@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+socketpair
+</keywords>
+</info>
+
+# Client-side
+<client>
+<features>
+unittest
+</features>
+<name>
+verify_nonce() fails around its deadline on a silent peer instead of hanging forever
+</name>
+
+</client>
+</testcase>
