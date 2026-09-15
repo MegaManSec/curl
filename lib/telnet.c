@@ -1448,8 +1448,22 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
   }
 
   while(keepon) {
+    timediff_t poll_timeout_ms = interval_ms;
+
+    if(Curl_rlimit_active(&data->progress.dl.rlimit)) {
+      timediff_t wait_ms = Curl_rlimit_wait_ms(&data->progress.dl.rlimit,
+                                               Curl_pgrs_now(data));
+      if(wait_ms > 0) {
+        pfd[0].events = 0;
+        if(wait_ms < poll_timeout_ms)
+          poll_timeout_ms = wait_ms;
+      }
+      else
+        pfd[0].events = POLLIN;
+    }
+
     DEBUGF(infof(data, "telnet_do, poll %d fds", poll_cnt));
-    switch(Curl_poll(pfd, (unsigned int)poll_cnt, interval_ms)) {
+    switch(Curl_poll(pfd, (unsigned int)poll_cnt, poll_timeout_ms)) {
     case -1:                    /* error, stop reading */
       keepon = FALSE;
       continue;
@@ -1461,7 +1475,15 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
       if(pfd[0].revents & POLLIN) {
         /* read data from network */
         size_t nread;
-        result = Curl_xfer_recv(data, buffer, sizeof(buffer), &nread);
+        size_t buflen = sizeof(buffer);
+
+        if(Curl_rlimit_active(&data->progress.dl.rlimit)) {
+          curl_off_t dl_avail =
+            Curl_rlimit_avail(&data->progress.dl.rlimit, NULL);
+          if(dl_avail > 0 && dl_avail < (curl_off_t)buflen)
+            buflen = (size_t)dl_avail;
+        }
+        result = Curl_xfer_recv(data, buffer, buflen, &nread);
         /* read would have blocked. Loop again */
         if(result == CURLE_AGAIN)
           break;
@@ -1538,7 +1560,7 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
     }
 
     if(!result) {
-      result = Curl_pgrsUpdate(data);
+      result = Curl_pgrsCheck(data);
       if(result)
         keepon = FALSE;
     }
