@@ -1978,6 +1978,29 @@ static CURLcode schannel_send(struct Curl_cfilter *cf, struct Curl_easy *data,
   DEBUGASSERT(backend);
   *pnwritten = 0;
 
+  if(backend->send_blocked_len) {
+    /* a previously encrypted message is still queued, flush it before
+       encrypting any new plaintext */
+    size_t this_write = 0;
+
+    result = Curl_conn_cf_send(cf->next, data,
+                               (const uint8_t *)backend->send_buffer +
+                                 backend->send_blocked_sent,
+                               backend->send_blocked_len -
+                                 backend->send_blocked_sent,
+                               FALSE, &this_write);
+    if(result)
+      return result;
+    backend->send_blocked_sent += this_write;
+    if(backend->send_blocked_sent < backend->send_blocked_len)
+      return CURLE_AGAIN;
+    *pnwritten = backend->send_blocked_len - backend->stream_sizes.cbHeader -
+      backend->stream_sizes.cbTrailer;
+    backend->send_blocked_len = 0;
+    backend->send_blocked_sent = 0;
+    return CURLE_OK;
+  }
+
   if(backend->recv_renegotiating) {
     result = schannel_recv_renegotiate(cf, data, SCH_RENEG_CALLER_IS_SEND);
     if(result)
@@ -2022,65 +2045,30 @@ static CURLcode schannel_send(struct Curl_cfilter *cf, struct Curl_easy *data,
 
   /* check if the message was encrypted */
   if(sspi_status == SEC_E_OK) {
+    size_t this_write = 0;
 
     /* send the encrypted message including header, data and trailer */
     len = outbuf[0].cbBuffer + outbuf[1].cbBuffer + outbuf[2].cbBuffer;
 
-    /* it is important to send the full message which includes the header,
-       encrypted payload, and trailer. Until the client receives all the
-       data a coherent message has not been delivered and the client
-       cannot read any of it.
-
-       If we wanted to buffer the unwritten encrypted bytes, we would
-       tell the client that all data it has requested to be sent has been
-       sent. The unwritten encrypted bytes would be the first bytes to
-       send on the next invocation.
-       Here's the catch with this - if we tell the client that all the
-       bytes have been sent, does the client call this method again to
-       send the buffered data?  Looking at who calls this function, it
-       seems the answer is NO. */
-
-    /* send entire message or fail */
-    while(len > *pnwritten) {
-      size_t this_write = 0;
-      int what;
-      timediff_t timeout_ms = Curl_timeleft_ms(data);
-      if(timeout_ms < 0) {
-        /* we already got the timeout */
-        failf(data, "schannel: timed out sending data (bytes sent: %zu)",
-              *pnwritten);
-        result = CURLE_OPERATION_TIMEDOUT;
-        break;
-      }
-      else if(!timeout_ms)
-        timeout_ms = TIMEDIFF_T_MAX;
-      what = SOCKET_WRITABLE(Curl_conn_cf_get_socket(cf, data), timeout_ms);
-      if(what < 0) {
-        /* fatal error */
-        failf(data, "select/poll on SSL socket, errno: %d", SOCKERRNO);
-        result = CURLE_SEND_ERROR;
-        break;
-      }
-      else if(what == 0) {
-        failf(data, "schannel: timed out sending data (bytes sent: %zu)",
-              *pnwritten);
-        result = CURLE_OPERATION_TIMEDOUT;
-        break;
-      }
-      /* socket is writable */
-
-       result = Curl_conn_cf_send(cf->next, data,
-                                  (const uint8_t *)ptr + *pnwritten,
-                                  len - *pnwritten,
-                                  FALSE, &this_write);
-      if(result == CURLE_AGAIN)
-        continue;
-      else if(result) {
-        break;
-      }
-
-      *pnwritten += this_write;
+    result = Curl_conn_cf_send(cf->next, data, (const uint8_t *)ptr, len,
+                               FALSE, &this_write);
+    if(result == CURLE_AGAIN) {
+      backend->send_blocked_len = len;
+      backend->send_blocked_sent = 0;
+      return CURLE_AGAIN;
     }
+    else if(result)
+      return result;
+
+    if(this_write < len) {
+      backend->send_blocked_len = len;
+      backend->send_blocked_sent = this_write;
+      return CURLE_AGAIN;
+    }
+
+    /* Encrypted message including header, data and trailer entirely sent.
+       The return value is the number of unencrypted bytes that were sent. */
+    *pnwritten = outbuf[1].cbBuffer;
   }
   else if(sspi_status == SEC_E_INSUFFICIENT_MEMORY) {
     result = CURLE_OUT_OF_MEMORY;
@@ -2088,11 +2076,6 @@ static CURLcode schannel_send(struct Curl_cfilter *cf, struct Curl_easy *data,
   else {
     result = CURLE_SEND_ERROR;
   }
-
-  if(len == *pnwritten)
-    /* Encrypted message including header, data and trailer entirely sent.
-       The return value is the number of unencrypted bytes that were sent. */
-    *pnwritten = outbuf[1].cbBuffer;
 
   return result;
 }
