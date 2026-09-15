@@ -216,6 +216,15 @@ static char *parse_filename(const char *ptr, size_t len, char stop)
   if(copy != p)
     memmove(copy, p, strlen(p) + 1);
 
+#ifdef __VMS
+  /* neutralize OpenVMS native path syntax so the name cannot address a
+     device, directory or file version other than the default one */
+  for(q = copy; *q; q++) {
+    if(strchr(":[]<>;", *q))
+      *q = '_';
+  }
+#endif /* __VMS */
+
 #if defined(_WIN32) || defined(MSDOS)
   {
     char *sanitized;
