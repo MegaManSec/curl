@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+mime
+</keywords>
+</info>
+
+# Client-side
+<client>
+<tool>
+lib%TESTNUMBER
+</tool>
+<name>
+curl_easy_duphandle does not free source-owned mime callback state on
+failed duplication
+</name>
+</client>
+
+<verify>
+</verify>
+</testcase>

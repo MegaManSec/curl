@@ -9,6 +9,7 @@ See-also:
   - curl_easy_init (3)
   - curl_easy_reset (3)
   - curl_global_init (3)
+  - curl_mime_data_cb (3)
 Protocol:
   - All
 Added-in: 7.9
@@ -48,6 +49,11 @@ the duplicate handle.
 
 In multi-threaded programs, this function must be called in a synchronous way,
 the input handle may not be in use when cloned.
+
+If the source handle has a mime part set up with curl_mime_data_cb(3), the
+duplicate shares the same *arg* pointer for reading but never calls the
+associated *freefunc*: only the source handle owns and eventually frees that
+resource, including when duplication itself fails.
 
 # %PROTOCOLS%
 
