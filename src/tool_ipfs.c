@@ -179,7 +179,9 @@ CURLcode ipfs_url_rewrite(CURLU *uh, const char *protocol, char **url,
   /* set gateway parts in input URL */
   if(curl_url_set(uh, CURLUPART_SCHEME, gwscheme, CURLU_URLENCODE) ||
      curl_url_set(uh, CURLUPART_HOST, gwhost, CURLU_URLENCODE) ||
-     curl_url_set(uh, CURLUPART_PORT, gwport, CURLU_URLENCODE))
+     curl_url_set(uh, CURLUPART_PORT, gwport, CURLU_URLENCODE) ||
+     curl_url_set(uh, CURLUPART_USER, NULL, 0) ||
+     curl_url_set(uh, CURLUPART_PASSWORD, NULL, 0))
     goto clean;
 
   /* if the input path is a slash, clear it */
