@@ -159,8 +159,11 @@ CURLcode easysrc_perform(void)
       result = easysrc_add(&easysrc_code, srchard[i]);
     /* Each unconverted option */
     if(easysrc_toohard && !result) {
-      for(ptr = easysrc_toohard->first; ptr && !result; ptr = ptr->next)
+      struct curl_slist *next;
+      for(ptr = easysrc_toohard->first; ptr && !result; ptr = next) {
+        next = ptr->next;
         result = easysrc_add(&easysrc_code, ptr->data);
+      }
     }
     if(!result)
       result = easysrc_add(&easysrc_code, "");
