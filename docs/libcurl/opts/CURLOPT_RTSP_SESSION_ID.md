@@ -42,6 +42,11 @@ previous ones. Set it to NULL to disable its use again.
 **WARNING:** when changing the URL's origin in a reused easy handle, you might
 want to set or clear the Session ID to avoid reuse across different hosts.
 
+A connection that still has interleaved RTP data pending to be read is not
+reused for a transfer whose Session ID does not match the one the pending
+data belongs to; libcurl opens a new connection for it instead. This keeps
+data belonging to one session from being dispatched to another easy handle.
+
 # DEFAULT
 
 NULL
