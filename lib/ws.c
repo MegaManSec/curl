@@ -767,7 +767,7 @@ static CURLcode ws_cw_write(struct Curl_easy *data,
 
 out:
   if(!result) {
-    result = ws_flush(data, ws, Curl_api_is_in_callback(data));
+    result = ws_flush(data, ws, FALSE);
     if(result == CURLE_AGAIN)
       result = CURLE_OK;
   }
@@ -1689,7 +1689,7 @@ CURLcode curl_ws_recv(CURL *curl, void *buffer,
     if(!data->set.ws_raw_mode && ws->pending.type) {
       CURLcode r2 = ws_enc_add_pending(data, ws);
       if(!r2)
-        (void)ws_flush(data, ws, Curl_api_is_in_callback(data));
+        (void)ws_flush(data, ws, FALSE);
     }
     result = CURLE_OK;
   }
@@ -1769,6 +1769,7 @@ static CURLcode ws_send_raw_blocking(struct Curl_easy *data,
                                      const char *buffer, size_t buflen)
 {
   CURLcode result = CURLE_OK;
+  struct curltime entry = curlx_now();
   size_t nwritten;
 
   if(!data)
@@ -1785,6 +1786,7 @@ static CURLcode ws_send_raw_blocking(struct Curl_easy *data,
     if(buflen) {
       curl_socket_t sock = data->conn->sock[FIRSTSOCKET];
       timediff_t left_ms;
+      timediff_t wait_ms;
       int ev;
 
       CURL_TRC_WS(data, "ws_send_raw_blocking() partial, %zu left to send",
@@ -1794,11 +1796,20 @@ static CURLcode ws_send_raw_blocking(struct Curl_easy *data,
         failf(data, "[WS] Timeout waiting for socket becoming writable");
         return CURLE_SEND_ERROR;
       }
+      if(!left_ms) {
+        left_ms = DEFAULT_CONNECT_TIMEOUT -
+                  curlx_timediff_ms(curlx_now(), entry);
+        if(left_ms <= 0) {
+          failf(data, "[WS] Timeout waiting for socket becoming writable");
+          return CURLE_OPERATION_TIMEDOUT;
+        }
+      }
+      wait_ms = (left_ms < 500) ? left_ms : 500;
 
       /* POLLOUT socket */
       if(sock == CURL_SOCKET_BAD)
         return CURLE_SEND_ERROR;
-      ev = SOCKET_WRITABLE(sock, left_ms ? left_ms : 500);
+      ev = SOCKET_WRITABLE(sock, wait_ms);
       if(ev < 0) {
         failf(data, "[WS] Error while waiting for socket becoming writable");
         return CURLE_SEND_ERROR;
