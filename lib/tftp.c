@@ -140,6 +140,7 @@ struct tftp_conn {
   unsigned int    requested_blksize;
   unsigned short  block;
   BIT(remote_pinned);
+  BIT(tx_pending);
 };
 
 /**********************************************************
@@ -355,16 +356,63 @@ static CURLcode tftp_option_add(struct tftp_conn *state, size_t *csize,
  * Event handler for the TX state
  *
  **********************************************************/
+/**********************************************************
+ *
+ * tftp_tx_data
+ *
+ * Fill and send the current data block, or leave it pending in
+ * state->sbytes for a later call when the client reader pauses
+ *
+ **********************************************************/
+static CURLcode tftp_tx_data(struct tftp_conn *state)
+{
+  struct Curl_easy *data = state->data;
+  struct SingleRequest *k = &data->req;
+  CURLcode result;
+  ssize_t sbytes;
+  size_t cb; /* Bytes currently read */
+  char buffer[STRERROR_LEN];
+  char *bufptr;
+  bool eos;
+
+  bufptr = (char *)state->spacket.data + 4 + state->sbytes;
+  do {
+    result = Curl_client_read(data, bufptr, state->blksize - state->sbytes,
+                              &cb, &eos);
+    if(result)
+      return result;
+    state->sbytes += cb;
+    bufptr += cb;
+    if(!cb && !eos) {
+      /* no data yet, not EOF: leave the block pending */
+      state->tx_pending = TRUE;
+      return CURLE_OK;
+    }
+  } while(state->sbytes < state->blksize && cb);
+
+  state->tx_pending = FALSE;
+  sbytes = sendto(state->sockfd, (void *)state->spacket.data,
+                  4 + (SEND_TYPE_ARG3)state->sbytes, SEND_4TH_ARG,
+                  (struct sockaddr *)&state->remote_addr,
+                  state->remote_addrlen);
+  /* Check all sbytes were sent */
+  if(sbytes < 0) {
+    failf(data, "%s", curlx_strerror(SOCKERRNO, buffer, sizeof(buffer)));
+    return CURLE_SEND_ERROR;
+  }
+  /* Update the progress meter */
+  k->writebytecount += state->sbytes;
+  Curl_pgrs_upload_inc(data, state->sbytes);
+  return CURLE_OK;
+}
+
 static CURLcode tftp_tx(struct tftp_conn *state, tftp_event_t event)
 {
   struct Curl_easy *data = state->data;
   ssize_t sbytes;
   CURLcode result = CURLE_OK;
   struct SingleRequest *k = &data->req;
-  size_t cb; /* Bytes currently read */
   char buffer[STRERROR_LEN];
-  char *bufptr;
-  bool eos;
 
   switch(event) {
 
@@ -427,29 +475,9 @@ static CURLcode tftp_tx(struct tftp_conn *state, tftp_event_t event)
      * in some cases we must wait for additional data to build full (512 bytes)
      * data block.
      * */
+    DEBUGASSERT(!state->tx_pending);
     state->sbytes = 0;
-    bufptr = (char *)state->spacket.data + 4;
-    do {
-      result = Curl_client_read(data, bufptr, state->blksize - state->sbytes,
-                                &cb, &eos);
-      if(result)
-        return result;
-      state->sbytes += cb;
-      bufptr += cb;
-    } while(state->sbytes < state->blksize && cb);
-
-    sbytes = sendto(state->sockfd, (void *)state->spacket.data,
-                    4 + (SEND_TYPE_ARG3)state->sbytes, SEND_4TH_ARG,
-                    (struct sockaddr *)&state->remote_addr,
-                    state->remote_addrlen);
-    /* Check all sbytes were sent */
-    if(sbytes < 0) {
-      failf(data, "%s", curlx_strerror(SOCKERRNO, buffer, sizeof(buffer)));
-      return CURLE_SEND_ERROR;
-    }
-    /* Update the progress meter */
-    k->writebytecount += state->sbytes;
-    Curl_pgrs_upload_inc(data, state->sbytes);
+    result = tftp_tx_data(state);
     break;
 
   case TFTP_EVENT_TIMEOUT:
@@ -1146,6 +1174,9 @@ static timediff_t tftp_state_timeout(struct tftp_conn *state,
     state->state = TFTP_STATE_FIN;
     return timeout_ms;
   }
+  if(state->tx_pending)
+    /* no packet in flight, nothing to time out */
+    return timeout_ms;
   current = time(NULL);
   if(current > state->rx_time + state->retry_time) {
     if(event)
@@ -1175,11 +1206,19 @@ static CURLcode tftp_multi_statemach(struct Curl_easy *data, bool *done)
   if(!state)
     return CURLE_FAILED_INIT;
 
+  if(state->tx_pending) {
+    result = tftp_tx_data(state);
+    if(result)
+      return result;
+  }
+
   timeout_ms = tftp_state_timeout(state, &event);
   if(timeout_ms < 0) {
     failf(data, "TFTP response timeout");
     return CURLE_OPERATION_TIMEDOUT;
   }
+  if(state->tx_pending)
+    return CURLE_OK;
   if(event != TFTP_EVENT_NONE) {
     result = tftp_state_machine(state, event);
     if(result)
