@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+CURLOPT_SHARE
+CURLOPT_CONNECT_ONLY
+shared connections
+</keywords>
+</info>
+
+# Server-side
+<reply>
+<data>
+</data>
+</reply>
+
+# Client-side
+<client>
+<server>
+http
+</server>
+<tool>
+lib%TESTNUMBER
+</tool>
+<name>
+CURLOPT_SHARE must not resolve a stale pool-local connection id
+</name>
+<command>
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+</verify>
+</testcase>

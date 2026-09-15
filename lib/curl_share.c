@@ -460,6 +460,10 @@ CURLcode Curl_share_easy_link(struct Curl_easy *data,
     share_ref_inc(share);
     data->share = share;
 
+    if(share->specifier & (1 << CURL_LOCK_DATA_CONNECT))
+      /* forget any previous pool-local connection id */
+      data->state.lastconnect_id = -1;
+
 #if !defined(CURL_DISABLE_HTTP) && !defined(CURL_DISABLE_COOKIES)
     if(share->cookies) {
       /* use shared cookie list, first free own one if any */
