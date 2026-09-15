@@ -184,6 +184,43 @@ static CURLcode test_unit1654(const char *arg)
   result = Curl_altsvc_parse(curl, asi, "clear\r\n", origin, ALPN_h1);
   fail_if(result, "Curl_altsvc_parse(14) failed!");
 
+  /* IPv6 zone/scope: an alt-svc entry learned on one zone of a link-local
+     address must not be usable for a lookup on a different zone of the
+     exact same numeric address */
+  {
+    size_t before = Curl_llist_count(&asi->list);
+
+    if(Curl_peer_create(curl, scheme, "fe80::1%1", 443, &origin))
+      goto fail;
+    result = Curl_altsvc_parse(curl, asi, "h2=\"altsvc-a.example:443\"\r\n",
+                               origin, ALPN_h1);
+    fail_if(result, "Curl_altsvc_parse(15) failed!");
+    fail_unless(Curl_llist_count(&asi->list) == before + 1,
+                "wrong number of entries");
+    fail_unless(Curl_altsvc_lookup(asi, origin, ALPN_h1, &dstentry,
+                                   CURLALTSVC_H2, &same_destination),
+                "same-zone alt-svc entry not found");
+
+    if(Curl_peer_create(curl, scheme, "fe80::1%2", 443, &origin))
+      goto fail;
+    fail_if(Curl_altsvc_lookup(asi, origin, ALPN_h1, &dstentry,
+                               CURLALTSVC_H2, &same_destination),
+            "alt-svc entry wrongly matched on a different IPv6 zone");
+
+    if(Curl_peer_create(curl, scheme, "fe80::1", 443, &origin))
+      goto fail;
+    fail_if(Curl_altsvc_lookup(asi, origin, ALPN_h1, &dstentry,
+                               CURLALTSVC_H2, &same_destination),
+            "alt-svc entry wrongly matched an unscoped lookup");
+
+    if(Curl_peer_create(curl, scheme, "fe80::1%1", 443, &origin))
+      goto fail;
+    result = Curl_altsvc_parse(curl, asi, "clear\r\n", origin, ALPN_h1);
+    fail_if(result, "Curl_altsvc_parse(16) failed!");
+    fail_unless(Curl_llist_count(&asi->list) == before,
+                "clear did not remove the zoned entry");
+  }
+
   Curl_altsvc_save(curl, asi, outname);
 
 fail:
