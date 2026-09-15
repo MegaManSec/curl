@@ -57,6 +57,7 @@ TESTS_C = \
   cli_ev_download.c \
   cli_ftp_upload.c \
   cli_h2_pausing.c \
+  cli_h2_push_erroroout.c \
   cli_h2_serverpush.c \
   cli_h2_upgrade_extreme.c \
   cli_hx_download.c \
