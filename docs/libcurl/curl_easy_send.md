@@ -53,6 +53,11 @@ Furthermore if you wait on the socket and it tells you it is writable,
 curl_easy_send(3) may return **CURLE_AGAIN** if the only data that was sent
 was for internal SSL processing, and no other data could be sent.
 
+If a call returns **CURLE_AGAIN**, the retry must pass the same *buffer*
+and a *buflen* that is at least as large as the one used in that call. A
+shorter *buflen* on retry can make the function fail with
+**CURLE_BAD_FUNCTION_ARGUMENT**.
+
 # %PROTOCOLS%
 
 # EXAMPLE

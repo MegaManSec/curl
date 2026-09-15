@@ -131,7 +131,10 @@ returned.
 
 Instead of blocking, the function returns **CURLE_AGAIN**. The correct
 behavior is then to wait for the socket to signal readability before calling
-this function again.
+this function again, passing the same *buffer* and a *buflen* that is at
+least as large as the one used in the call that returned **CURLE_AGAIN**. A
+shorter *buflen* on retry can make the function fail with
+**CURLE_BAD_FUNCTION_ARGUMENT**.
 
 Any other non-zero return value indicates an error. See the libcurl-errors(3)
 man page for the full list with descriptions.
