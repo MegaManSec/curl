@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP POST
+</keywords>
+</info>
+
+# Server-side
+<reply>
+<data crlf="headers">
+HTTP/1.1 200 OK
+Date: Tue, 09 Nov 2010 14:49:00 GMT
+Content-Length: 6
+
+first
+</data>
+<data1>
+</data1>
+</reply>
+
+# Client-side
+<client>
+<server>
+http
+</server>
+<name>
+HTTP POST is not silently replayed after stale reused connection
+</name>
+<command>
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER --next -d "buy=widget&qty=1" http://%HOSTIP:%HTTPPORT/%TESTNUMBER0001
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+52
+</errorcode>
+<protocol crlf="headers" nonewline="yes">
+GET /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+
+POST /%TESTNUMBER0001 HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+Content-Length: 16
+Content-Type: application/x-www-form-urlencoded
+
+buy=widget&qty=1
+</protocol>
+</verify>
+</testcase>
