@@ -1664,7 +1664,8 @@ static CURLcode http_write_header(struct Curl_easy *data,
   if(result)
     return result;
 
-  result = Curl_bump_headersize(data, hdlen, FALSE);
+  result = Curl_bump_headersize(data, hdlen + data->state.foldbytes, FALSE);
+  data->state.foldbytes = 0;
   if(result)
     return result;
 
@@ -3054,6 +3055,7 @@ CURLcode Curl_http(struct Curl_easy *data, bool *done)
      previous transfer */
   curlx_dyn_reset(&data->state.headerb);
   data->state.maybe_folded = FALSE;
+  data->state.foldbytes = 0;
 
   if(!data->conn->bits.reuse) {
     result = http_check_new_conn(data);
@@ -4405,7 +4407,8 @@ static CURLcode http_rw_hd(struct Curl_easy *data,
   if(result)
     return result;
 
-  result = Curl_bump_headersize(data, hdlen, FALSE);
+  result = Curl_bump_headersize(data, hdlen + data->state.foldbytes, FALSE);
+  data->state.foldbytes = 0;
   if(result)
     return result;
 
@@ -4480,6 +4483,7 @@ static CURLcode http_parse_headers(struct Curl_easy *data,
         blen--;
         unfold_len++;
       }
+      data->state.foldbytes += unfold_len;
       if(blen) {
         /* insert a single space */
         result = curlx_dyn_addn(&data->state.headerb, " ", 1);
