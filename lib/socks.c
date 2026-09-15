@@ -155,6 +155,55 @@ CURLcode Curl_blockread_all(struct Curl_cfilter *cf,
     *pnread += nread;
   }
 }
+
+/*
+ * Helper write-to-socket function. Does the same as Curl_blockread_all but
+ * for sending. Blocks until all bytes amount of buffersize have been sent
+ * or the connect timeout expires. No more, no less.
+ *
+ * This is STUPID BLOCKING behavior. Only used by the SOCKS GSSAPI functions.
+ */
+CURLcode Curl_blockwrite_all(struct Curl_cfilter *cf,
+                             struct Curl_easy *data,
+                             const void *buf,             /* data to send */
+                             size_t blen,                 /* amount to send */
+                             size_t *pnwritten)           /* amount sent */
+{
+  const unsigned char *bufp = buf;
+  size_t nwritten = 0;
+  CURLcode result;
+
+  *pnwritten = 0;
+  for(;;) {
+    timediff_t timeout_ms = Curl_timeleft_ms(data);
+    curl_socket_t sock = Curl_conn_cf_get_socket(cf, data);
+
+    if(timeout_ms < 0) {
+      /* we already got the timeout */
+      return CURLE_OPERATION_TIMEDOUT;
+    }
+    if(!timeout_ms)
+      timeout_ms = TIMEDIFF_T_MAX;
+    if(SOCKET_WRITABLE(sock, timeout_ms) <= 0)
+      return CURLE_OPERATION_TIMEDOUT;
+    result = Curl_conn_cf_send(cf->next, data, bufp, blen, FALSE, &nwritten);
+    if(result == CURLE_AGAIN)
+      continue;
+    else if(result)
+      return result;
+
+    if(blen == nwritten) {
+      *pnwritten += nwritten;
+      return CURLE_OK;
+    }
+    if(!nwritten)
+      return CURLE_SEND_ERROR;
+
+    bufp += nwritten;
+    blen -= nwritten;
+    *pnwritten += nwritten;
+  }
+}
 #endif
 
 #if defined(DEBUGBUILD) && defined(CURLVERBOSE)
