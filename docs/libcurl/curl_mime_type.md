@@ -40,6 +40,9 @@ The mime type string is copied into the part, thus the associated storage may
 safely be released or reused after call. Setting a part's type multiple times
 is valid: only the value set by the last call is retained.
 
+*mimetype* must not contain a carriage return or line feed character; this
+function returns CURLE_BAD_FUNCTION_ARGUMENT if it does.
+
 In the absence of a mime type and if needed by the protocol specifications,
 a default mime type is determined by the context:
 
