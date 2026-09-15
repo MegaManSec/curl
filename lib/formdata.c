@@ -505,27 +505,8 @@ static CURLFORMcode formadd(struct curl_httppost **httppost,
 
     case CURLFORM_CONTENTTYPE:
       avalue = form_ptr_arg(char *);
-      if(Curl_bufref_ptr(&curr->contenttype)) {
-        if(curr->flags & HTTPPOST_FILENAME) {
-          if(avalue) {
-            form = forminfo_new();
-            if(!form || Curl_bufref_memdup0(&form->contenttype, avalue,
-                                            strlen(avalue))) {
-              curlx_free(form);
-              retval = CURL_FORMADD_MEMORY;
-            }
-            else {
-              forminfo_add(form, curr);
-              curr = form;
-              form = NULL;
-            }
-          }
-          else
-            retval = CURL_FORMADD_NULL;
-        }
-        else
-          retval = CURL_FORMADD_OPTION_TWICE;
-      }
+      if(Curl_bufref_ptr(&curr->contenttype))
+        retval = CURL_FORMADD_OPTION_TWICE;
       else if(avalue) {
         if(Curl_bufref_memdup0(&curr->contenttype, avalue, strlen(avalue)))
           retval = CURL_FORMADD_MEMORY;
