@@ -128,6 +128,11 @@ Instead of blocking, the function returns **CURLE_AGAIN**. The correct
 behavior is then to wait for the socket to signal readability before calling
 this function again.
 
+While this function may be called reentrantly from within a callback
+invoked during a previous, still ongoing call on the same easy handle,
+returns **CURLE_RECURSIVE_API_CALL** if that reentrant call happens while
+the outer call is in the middle of reading raw data from the network.
+
 Any other non-zero return value indicates an error. See the libcurl-errors(3)
 man page for the full list with descriptions.
 
