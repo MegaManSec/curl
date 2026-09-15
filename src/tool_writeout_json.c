@@ -29,6 +29,64 @@
 
 #define MAX_JSON_STRING 100000
 
+/* Return the length of the valid UTF-8 sequence starting at 'p', with
+   'left' bytes available to read. Returns 0 if there is no valid UTF-8
+   sequence starting at 'p'. */
+static size_t utf8seqlen(const unsigned char *p, size_t left)
+{
+  size_t need;
+  unsigned char lo;
+  unsigned char hi;
+  size_t n;
+
+  if(*p < 0x80)
+    return 1;
+  else if(*p >= 0xc2 && *p <= 0xdf) {
+    need = 2;
+    lo = 0x80;
+    hi = 0xbf;
+  }
+  else if(*p == 0xe0) {
+    need = 3;
+    lo = 0xa0;
+    hi = 0xbf;
+  }
+  else if(*p == 0xed) {
+    need = 3;
+    lo = 0x80;
+    hi = 0x9f;
+  }
+  else if(*p >= 0xe1 && *p <= 0xef) {
+    need = 3;
+    lo = 0x80;
+    hi = 0xbf;
+  }
+  else if(*p == 0xf0) {
+    need = 4;
+    lo = 0x90;
+    hi = 0xbf;
+  }
+  else if(*p == 0xf4) {
+    need = 4;
+    lo = 0x80;
+    hi = 0x8f;
+  }
+  else if(*p >= 0xf1 && *p <= 0xf3) {
+    need = 4;
+    lo = 0x80;
+    hi = 0xbf;
+  }
+  else
+    return 0;
+
+  if(left < need || p[1] < lo || p[1] > hi)
+    return 0;
+  for(n = 2; n < need; n++)
+    if(p[n] < 0x80 || p[n] > 0xbf)
+      return 0;
+  return need;
+}
+
 /* provide the given string in dynbuf as a quoted json string, but without the
    outer quotes. The buffer is not inited by this function.
 
@@ -65,12 +123,23 @@ int jsonquoted(const char *in, size_t len, struct dynbuf *out, bool lowercase)
     default:
       if(*i < 32)
         result = curlx_dyn_addf(out, "\\u%04x", *i);
-      else {
+      else if(*i < 0x80) {
         char o = (char)*i;
         if(lowercase && (o >= 'A' && o <= 'Z'))
           /* do not use tolower() since that is locale specific */
           o |= ('a' - 'A');
         result = curlx_dyn_addn(out, &o, 1);
+      }
+      else {
+        size_t seqlen = utf8seqlen(i, (size_t)(in_end - i));
+        if(seqlen)
+          result = curlx_dyn_addn(out, (const char *)i, seqlen);
+        else {
+          seqlen = 1;
+          /* invalid UTF-8, replace with U+FFFD */
+          result = curlx_dyn_addn(out, "\xef\xbf\xbd", 3);
+        }
+        i += seqlen - 1;
       }
       break;
     }
