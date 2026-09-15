@@ -47,6 +47,8 @@
  * when we take things out of the buffer.
  * Chunk size is large enough to take a full DATA frame */
 #define PROXY_H3_STREAM_RECV_CHUNKS ((512 * 1024) / H3_STREAM_CHUNK_SIZE)
+#define PROXY_H3_STREAM_RECV_MAX \
+  (PROXY_H3_STREAM_RECV_CHUNKS * H3_STREAM_CHUNK_SIZE)
 
 typedef enum {
   H3_TUNNEL_INIT,     /* init/default/no tunnel state */
@@ -272,6 +274,7 @@ static void cf_h3_proxy_upd_rx_win(struct Curl_cfilter *cf,
   struct cf_h3_proxy_ctx *pctx = cf->ctx;
   struct cf_ngtcp2_ctx *ctx = &pctx->ngtcp2_ctx;
   uint64_t cur_win, wanted_win = H3_STREAM_WINDOW_SIZE_MAX;
+  uint64_t buffered, avail_buf;
 
   /* how much does rate limiting allow us to acknowledge? */
   if(Curl_rlimit_active(&data->progress.dl.rlimit)) {
@@ -290,6 +293,12 @@ static void cf_h3_proxy_upd_rx_win(struct Curl_cfilter *cf,
     }
     wanted_win = CURLMIN((uint64_t)avail, H3_STREAM_WINDOW_SIZE_MAX);
   }
+
+  /* clamp to the room still left in the tunnel recvbuf */
+  buffered = (uint64_t)Curl_bufq_len(&pctx->tunnel.recvbuf);
+  avail_buf = (buffered < PROXY_H3_STREAM_RECV_MAX) ?
+    (PROXY_H3_STREAM_RECV_MAX - buffered) : 0;
+  wanted_win = CURLMIN(wanted_win, avail_buf);
 
   if(stream->rx_offset_max < stream->rx_offset) {
     DEBUGASSERT(0);
@@ -863,6 +872,7 @@ static CURLcode cf_h3_proxy_recv(struct Curl_cfilter *cf,
 
   if(*pnread) {
     Curl_multi_mark_dirty(data);
+    cf_h3_proxy_upd_rx_win(cf, data, stream);
   }
   else {
     if(stream->xfer_result) {
