@@ -1217,6 +1217,27 @@ static CURLcode telnet_done(struct Curl_easy *data,
   return CURLE_OK;
 }
 
+/*
+ * telnet_ul_avail()
+ *
+ * Return how many of the 'len' bytes waiting to be read from the upload
+ * source may be read and sent right now without exceeding the configured
+ * CURLOPT_MAX_SEND_SPEED_LARGE, using the same upload rate limiter the
+ * generic upload path consults.
+ */
+static size_t telnet_ul_avail(struct Curl_easy *data, size_t len)
+{
+  if(Curl_rlimit_active(&data->progress.ul.rlimit)) {
+    curl_off_t avail = Curl_rlimit_avail(&data->progress.ul.rlimit,
+                                         Curl_pgrs_now(data));
+    if(avail <= 0)
+      return 0;
+    if((curl_off_t)len > avail)
+      len = (size_t)avail;
+  }
+  return len;
+}
+
 static CURLcode telnet_do(struct Curl_easy *data, bool *done)
 {
   CURLcode result;
@@ -1296,16 +1317,34 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
   /* Keep on listening and act on events */
   while(keepon) {
     const DWORD buf_size = (DWORD)sizeof(buffer);
-    DWORD waitret = WaitForMultipleObjects(obj_count, objs,
-                                           FALSE, wait_timeout);
+    DWORD active_count = obj_count;
+    DWORD active_timeout = wait_timeout;
+    DWORD waitret;
+
+    if((obj_count == 2) &&
+       Curl_rlimit_active(&data->progress.ul.rlimit) &&
+       (Curl_rlimit_avail(&data->progress.ul.rlimit,
+                          Curl_pgrs_now(data)) <= 0)) {
+      /* upload speed limit reached: do not let stdin becoming ready wake
+         us up, wait for new send tokens instead to avoid busy-looping */
+      active_count = 1;
+      active_timeout = (DWORD)CURLMAX(1,
+        Curl_rlimit_wait_ms(&data->progress.ul.rlimit, Curl_pgrs_now(data)));
+    }
+
+    waitret = WaitForMultipleObjects(active_count, objs,
+                                     FALSE, active_timeout);
     switch(waitret) {
 
     case WAIT_TIMEOUT: {
       for(;;) {
+        size_t want = telnet_ul_avail(data, buf_size);
+        if(!want)
+          break;
         if(data->set.is_fread_set) {
           size_t n;
           /* read from user-supplied method */
-          n = data->state.fread_func(buffer, 1, buf_size, data->state.in);
+          n = data->state.fread_func(buffer, 1, want, data->state.in);
           if(n == CURL_READFUNC_ABORT) {
             keepon = FALSE;
             result = CURLE_READ_ERROR;
@@ -1333,7 +1372,8 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
           if(!readfile_read)
             break;
 
-          if(!ReadFile(stdin_handle, buffer, buf_size, &readfile_read, NULL)) {
+          if(!ReadFile(stdin_handle, buffer, (DWORD)want, &readfile_read,
+                       NULL)) {
             keepon = FALSE;
             result = CURLE_READ_ERROR;
             break;
@@ -1345,21 +1385,27 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
           keepon = FALSE;
           break;
         }
+        Curl_pgrs_upload_inc(data, (size_t)readfile_read);
       }
     }
     break;
 
     case WAIT_OBJECT_0 + 1: {
-      if(!ReadFile(stdin_handle, buffer, buf_size, &readfile_read, NULL)) {
-        keepon = FALSE;
-        result = CURLE_READ_ERROR;
-        break;
-      }
+      size_t want = telnet_ul_avail(data, buf_size);
+      if(want) {
+        if(!ReadFile(stdin_handle, buffer, (DWORD)want, &readfile_read,
+                     NULL)) {
+          keepon = FALSE;
+          result = CURLE_READ_ERROR;
+          break;
+        }
 
-      result = send_telnet_data(data, tn, buffer, readfile_read);
-      if(result) {
-        keepon = FALSE;
-        break;
+        result = send_telnet_data(data, tn, buffer, readfile_read);
+        if(result) {
+          keepon = FALSE;
+          break;
+        }
+        Curl_pgrs_upload_inc(data, (size_t)readfile_read);
       }
     }
     break;
@@ -1448,8 +1494,24 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
   }
 
   while(keepon) {
-    DEBUGF(infof(data, "telnet_do, poll %d fds", poll_cnt));
-    switch(Curl_poll(pfd, (unsigned int)poll_cnt, interval_ms)) {
+    int active_cnt = poll_cnt;
+    timediff_t timeout_ms = interval_ms;
+
+    if((poll_cnt == 2) &&
+       Curl_rlimit_active(&data->progress.ul.rlimit) &&
+       (Curl_rlimit_avail(&data->progress.ul.rlimit,
+                          Curl_pgrs_now(data)) <= 0)) {
+      /* upload speed limit reached: do not let the input file becoming
+         ready wake us up, wait for new send tokens instead to avoid
+         busy-looping */
+      active_cnt = 1;
+      pfd[1].revents = 0;
+      timeout_ms = CURLMAX(1, Curl_rlimit_wait_ms(&data->progress.ul.rlimit,
+                                                  Curl_pgrs_now(data)));
+    }
+
+    DEBUGF(infof(data, "telnet_do, poll %d fds", active_cnt));
+    switch(Curl_poll(pfd, (unsigned int)active_cnt, timeout_ms)) {
     case -1:                    /* error, stop reading */
       keepon = FALSE;
       continue;
@@ -1502,19 +1564,24 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
       snread = 0;
       if(poll_cnt == 2) {
         if(pfd[1].revents & POLLIN) { /* read from in file */
-          snread = read(pfd[1].fd, buffer, sizeof(buffer));
+          size_t want = telnet_ul_avail(data, sizeof(buffer));
+          if(want)
+            snread = read(pfd[1].fd, buffer, want);
         }
       }
       else {
-        /* read from user-supplied method */
-        snread = (int)data->state.fread_func(buffer, 1, sizeof(buffer),
-                                             data->state.in);
-        if(snread == CURL_READFUNC_ABORT) {
-          keepon = FALSE;
-          break;
+        size_t want = telnet_ul_avail(data, sizeof(buffer));
+        if(want) {
+          /* read from user-supplied method */
+          snread = (int)data->state.fread_func(buffer, 1, want,
+                                               data->state.in);
+          if(snread == CURL_READFUNC_ABORT) {
+            keepon = FALSE;
+            break;
+          }
+          if(snread == CURL_READFUNC_PAUSE)
+            break;
         }
-        if(snread == CURL_READFUNC_PAUSE)
-          break;
       }
 
       if(snread > 0) {
