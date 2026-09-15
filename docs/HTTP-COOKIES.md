@@ -38,7 +38,9 @@ implemented by curl.
 curl considers `http://localhost` to be a *secure context*, meaning that it
 allows and uses cookies marked with the `secure` keyword even when done over
 plain HTTP for this host. curl does this to match how popular browsers work
-with secure cookies.
+with secure cookies. This exception does not apply when a proxy is used for
+the request, since the traffic then leaves the local machine and the
+`secure` cookie is withheld as it would be for any other plain HTTP host.
 
 ## Super cookies
 
