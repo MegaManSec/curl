@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+cpool
+</keywords>
+</info>
+
+# Client-side
+<client>
+<features>
+unittest
+</features>
+<name>
+cpool_discard_conn never discards an in-use connection
+</name>
+</client>
+</testcase>
