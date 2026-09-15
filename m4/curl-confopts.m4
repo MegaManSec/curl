@@ -29,7 +29,9 @@ dnl CURL_CHECK_OPTION_THREADED_RESOLVER
 dnl -------------------------------------------------
 dnl Verify if configure has been invoked with option
 dnl --enable-threaded-resolver or --disable-threaded-resolver, and
-dnl set shell variable want_threaded_resolver as appropriate.
+dnl set shell variable want_threaded_resolver as appropriate. Requires
+dnl CURL_CHECK_FUNC_GETADDRINFO to have already run, so that
+dnl curl_cv_func_getaddrinfo_threadsafe is set.
 
 AC_DEFUN([CURL_CHECK_OPTION_THREADED_RESOLVER], [
   AC_MSG_CHECKING([whether to enable the threaded resolver])
@@ -46,6 +48,10 @@ AS_HELP_STRING([--disable-threaded-resolver],[Disable threaded resolver]),
     yes)
       dnl --enable-threaded-resolver option used
       want_threaded_resolver="yes"
+      if test "$curl_cv_func_getaddrinfo" = "yes" &&
+         test "$curl_cv_func_getaddrinfo_threadsafe" = "no"; then
+        AC_MSG_WARN([threaded resolver forced on a target whose getaddrinfo is not thread-safe; concurrent resolves may crash or race])
+      fi
       ;;
     *)
       dnl configure option not specified
@@ -55,6 +61,9 @@ AS_HELP_STRING([--disable-threaded-resolver],[Disable threaded resolver]),
           ;;
         *)
           if test "$want_ares" = "yes"; then
+            want_threaded_resolver="no"
+          elif test "$curl_cv_func_getaddrinfo" = "yes" &&
+               test "$curl_cv_func_getaddrinfo_threadsafe" = "no"; then
             want_threaded_resolver="no"
           else
             want_threaded_resolver="yes"

@@ -631,15 +631,6 @@ if(NOT WIN32)
   endif()
 endif()
 
-if(ENABLE_THREADED_RESOLVER)
-  if(NOT WIN32 AND NOT HAVE_THREADS_POSIX)
-    message(FATAL_ERROR "Threaded resolver requires POSIX Threads.")
-  endif()
-  set(USE_RESOLV_THREADED ON)
-elseif(USE_ARES)
-  set(USE_RESOLV_ARES ON)
-endif()
-
 # Check for all needed libraries
 if(DOS)
   if(WATT_ROOT)
@@ -1817,6 +1808,19 @@ if(_cmake_try_compile_target_type_save)
 endif()
 
 include(CMake/OtherTests.cmake)
+
+if(ENABLE_THREADED_RESOLVER)
+  if(NOT WIN32 AND NOT HAVE_THREADS_POSIX)
+    message(FATAL_ERROR "Threaded resolver requires POSIX Threads.")
+  endif()
+  if(HAVE_GETADDRINFO AND NOT HAVE_GETADDRINFO_THREADSAFE)
+    message(WARNING "Threaded resolver disabled: getaddrinfo is not thread-safe on this target.")
+  else()
+    set(USE_RESOLV_THREADED ON)
+  endif()
+elseif(USE_ARES)
+  set(USE_RESOLV_ARES ON)
+endif()
 
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS "HAVE_CONFIG_H")
 

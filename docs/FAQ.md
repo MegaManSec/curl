@@ -1138,6 +1138,14 @@ Using this offers asynchronous name resolves.
 
 It uses the IPv6 or the non-IPv6 resolver solution in a temporary thread.
 
+configure and CMake only enable this resolver by default on targets where
+`getaddrinfo()` was detected to be thread-safe. On targets where it is known
+not to be, `--enable-threaded-resolver` still forces it on but prints a
+warning, since calling a non-thread-safe `getaddrinfo()` from multiple
+resolver threads at once can crash or corrupt results. CMake does not honor
+the same override: `-DENABLE_THREADED_RESOLVER=ON` still refuses to enable
+it on such targets, printing a warning instead.
+
 ## How do I prevent libcurl from writing the response to stdout?
 
 libcurl provides a default built-in write function that writes received data
