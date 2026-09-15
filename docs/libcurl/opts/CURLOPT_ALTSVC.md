@@ -41,6 +41,10 @@ option.
 Using this option multiple times makes the last set string override the
 previous ones. Set it to NULL to disable its use again.
 
+A response with the `Alt-Svc: clear` header removes all the cached
+alternatives for that origin, regardless of which HTTP version they were
+originally learned over.
+
 # SECURITY CONCERNS
 
 libcurl cannot fully protect against attacks where an attacker has write

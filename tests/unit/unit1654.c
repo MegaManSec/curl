@@ -184,6 +184,22 @@ static CURLcode test_unit1654(const char *arg)
   result = Curl_altsvc_parse(curl, asi, "clear\r\n", origin, ALPN_h1);
   fail_if(result, "Curl_altsvc_parse(14) failed!");
 
+  /* clear over h1 must also remove an entry learned over h2 */
+  if(Curl_peer_create(curl, scheme, "cross-alpn.example", 443, &origin))
+    goto fail;
+  result = Curl_altsvc_parse(curl, asi, "h3=\":443\"; ma=120\r\n",
+                             origin, ALPN_h2);
+  fail_if(result, "Curl_altsvc_parse(15) failed!");
+  fail_unless(Curl_altsvc_lookup(asi, origin, ALPN_h2, &dstentry,
+                                 CURLALTSVC_H3, &same_destination),
+              "alt-svc entry learned over h2 not found");
+
+  result = Curl_altsvc_parse(curl, asi, "clear\r\n", origin, ALPN_h1);
+  fail_if(result, "Curl_altsvc_parse(16) failed!");
+  fail_if(Curl_altsvc_lookup(asi, origin, ALPN_h2, &dstentry,
+                             CURLALTSVC_H3, &same_destination),
+          "clear received over h1 did not remove the entry learned over h2");
+
   Curl_altsvc_save(curl, asi, outname);
 
 fail:
