@@ -114,6 +114,10 @@ curl_realloc_callback Curl_crealloc = (curl_realloc_callback)realloc;
 curl_strdup_callback Curl_cstrdup = (curl_strdup_callback)CURLX_STRDUP_LOW;
 curl_calloc_callback Curl_ccalloc = (curl_calloc_callback)calloc;
 
+/* set while memory handed out by curl_getenv() is outstanding, cleared by
+   curl_free() once it is released */
+bool Curl_memfuncs_used = FALSE;
+
 #if defined(_MSC_VER) && defined(_DLL)
 #  pragma warning(pop)
 #endif
@@ -134,6 +138,13 @@ static CURLcode global_init(long flags, bool memoryfuncs)
     return CURLE_OK;
 
   if(memoryfuncs) {
+    if(Curl_memfuncs_used) {
+      /* the currently active callbacks already handed out memory that
+         would end up freed by the defaults installed below, so refuse */
+      initialized--;
+      return CURLE_FAILED_INIT;
+    }
+
     /* Setup the default memory functions here (again) */
     Curl_cmalloc = (curl_malloc_callback)malloc;
     Curl_cfree = (curl_free_callback)free;
@@ -260,6 +271,13 @@ CURLcode curl_global_init_mem(long flags, curl_malloc_callback m,
     initialized++;
     global_init_unlock();
     return CURLE_OK;
+  }
+
+  if(Curl_memfuncs_used) {
+    /* the default callbacks already handed out memory that would end up
+       freed by the callbacks installed below, so refuse the swap */
+    global_init_unlock();
+    return CURLE_FAILED_INIT;
   }
 
   /* set memory functions before global_init() in case it wants memory

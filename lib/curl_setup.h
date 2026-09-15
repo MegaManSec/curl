@@ -1274,6 +1274,7 @@ extern curl_free_callback Curl_cfree;
 extern curl_realloc_callback Curl_crealloc;
 extern curl_strdup_callback Curl_cstrdup;
 extern curl_calloc_callback Curl_ccalloc;
+extern bool Curl_memfuncs_used;
 
 /*
  * curlx_safefree() defined as a macro to allow MemoryTracking feature

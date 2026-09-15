@@ -272,6 +272,8 @@ char *curl_easy_unescape(CURL *curl, const char *string, int inlength,
    the library's memory system */
 void curl_free(void *p)
 {
+  if(p)
+    Curl_memfuncs_used = FALSE;
   curlx_free(p);
 }
 

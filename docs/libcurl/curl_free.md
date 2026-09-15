@@ -7,6 +7,8 @@ Source: libcurl
 See-also:
   - curl_easy_escape (3)
   - curl_easy_unescape (3)
+  - curl_getenv (3)
+  - curl_global_init_mem (3)
 Protocol:
   - All
 Added-in: 7.1
@@ -29,6 +31,9 @@ void curl_free(void *ptr);
 curl_free reclaims memory that has been obtained through a libcurl call. Use
 curl_free(3) instead of free() to avoid anomalies that can result from
 differences in memory management between your application and libcurl.
+
+See curl_global_init_mem(3) for how this interacts with curl_getenv(3) and
+custom memory functions.
 
 Passing in a NULL pointer in *ptr* makes this function return immediately
 with no action.
