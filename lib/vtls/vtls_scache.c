@@ -1231,6 +1231,8 @@ CURLcode Curl_ssl_session_import(struct Curl_easy *data,
   if(result)
     goto out;
 
+  s->sectrust_verified = FALSE;
+
   Curl_ssl_scache_lock(data);
 
   if(ssl_peer_key) {
