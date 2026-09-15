@@ -970,7 +970,9 @@ static CURLcode on_stream_frame(struct Curl_cfilter *cf,
       }
     }
     break;
-  case NGHTTP2_HEADERS:
+  case NGHTTP2_HEADERS: {
+    bool is_final;
+
     if(stream->bodystarted) {
       /* Only valid HEADERS after body started is trailer HEADERS. We
          buffer them in on_header callback. */
@@ -984,7 +986,8 @@ static CURLcode on_stream_frame(struct Curl_cfilter *cf,
       return CURLE_RECV_ERROR;
 
     /* Only final status code signals the end of header */
-    if(stream->status_code / 100 != 1)
+    is_final = stream->status_code / 100 != 1;
+    if(is_final)
       stream->bodystarted = TRUE;
     else
       stream->status_code = -1;
@@ -992,11 +995,12 @@ static CURLcode on_stream_frame(struct Curl_cfilter *cf,
     h2_xfer_write_resp_hd(cf, data, stream, STRCONST("\r\n"),
                           (bool)stream->closed);
 
-    if(stream->status_code / 100 != 1) {
+    if(is_final) {
       stream->resp_hds_complete = TRUE;
     }
     Curl_multi_mark_dirty(data);
     break;
+  }
   case NGHTTP2_PUSH_PROMISE:
     rv = push_promise(cf, data, &frame->push_promise);
     if(rv) { /* deny! */
