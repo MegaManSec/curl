@@ -213,6 +213,29 @@ get_url_filename()
     # No slash means there was only a hostname and no path; return empty string.
 }
 
+# Atomically commit an already-downloaded temporary file to the given base
+# path, appending ".1", ".2", etc. up to ".9999" if the base path (or a
+# suffixed variant) is already taken. Prints the path it was committed to.
+# 'ln' fails with EEXIST without following or truncating an existing target
+# (including a pre-existing symlink), so this is safe against a target that
+# gets created between our caller starting the download and this call.
+# Used as a substitute for --no-clobber on curl versions that lack it.
+commit_output_path()
+{
+    tmp_path="${1}"
+    candidate="${2}"
+    suffix=0
+    while ! ln "${tmp_path}" "${candidate}" 2> /dev/null; do
+        suffix=$((suffix + 1))
+        if [ "${suffix}" -gt 9999 ]; then
+            return 1
+        fi
+        candidate="${2}.${suffix}"
+    done
+    rm -f "${tmp_path}"
+    printf "%s\n" "${candidate}"
+}
+
 # Execute curl with the list of URLs provided by the user.
 exec_curl()
 {
@@ -267,6 +290,9 @@ exec_curl()
     set -- ${CMD} ${CURL_PARALLEL}
 
     NEXT_PARAMETER=""
+    PENDING_COMMITS_FILE="${TMPDIR:-/tmp}/.wcurl-pending.$$"
+    rm -f "${PENDING_COMMITS_FILE}"
+    url_index=0
     for url in ${URLS}; do
         # If the user did not provide an output path, define one.
         if [ "${HAS_USER_SET_OUTPUT}" = "false" ]; then
@@ -274,16 +300,46 @@ exec_curl()
             # If we could not get a path from the URL, use the default: index.html.
             [ -z "${OUTPUT_PATH}" ] && OUTPUT_PATH=index.html
         fi
+
+        url_index=$((url_index + 1))
+        CURL_OUTPUT_PATH="${OUTPUT_PATH}"
+
+        # curl lacks --no-clobber before 7.83.0. Download to a private temp
+        # file and commit it into place after curl exits, instead of letting
+        # curl open the final path by name itself. "-" means stdout, which
+        # is never subject to clobber protection.
+        if [ -z "${CURL_NO_CLOBBER}" ] && [ "${DRY_RUN}" = "false" ] && [ "${OUTPUT_PATH}" != "-" ]; then
+            CURL_OUTPUT_PATH="${OUTPUT_PATH}.wcurl-tmp.$$.${url_index}"
+            printf "%s\t%s\n" "${CURL_OUTPUT_PATH}" "${OUTPUT_PATH}" >> "${PENDING_COMMITS_FILE}"
+        fi
+
         # shellcheck disable=SC2086
-        set -- "$@" ${NEXT_PARAMETER} ${PER_URL_PARAMETERS} ${CURL_NO_CLOBBER} --output "${OUTPUT_PATH}" ${CURL_OPTIONS} --url "${url}"
+        set -- "$@" ${NEXT_PARAMETER} ${PER_URL_PARAMETERS} ${CURL_NO_CLOBBER} --output "${CURL_OUTPUT_PATH}" ${CURL_OPTIONS} --url "${url}"
         NEXT_PARAMETER="--next"
     done
 
-    if [ "${DRY_RUN}" = "false" ]; then
-        exec "$@"
-    else
+    if [ "${DRY_RUN}" = "true" ]; then
         printf "%s\n" "$@"
+        return
     fi
+
+    # Fast path: nothing needs to be committed after the fact, so let curl
+    # replace this process as before.
+    if [ ! -e "${PENDING_COMMITS_FILE}" ]; then
+        exec "$@"
+    fi
+
+    curl_status=0
+    "$@" || curl_status="$?"
+
+    while IFS="$(printf '\t')" read -r tmp_path final_path; do
+        [ -e "${tmp_path}" ] || continue
+        commit_output_path "${tmp_path}" "${final_path}" > /dev/null \
+            || error "Could not find a non-clobbering output filename for '${final_path}' (tried up to 9999 suffixes)."
+    done < "${PENDING_COMMITS_FILE}"
+
+    rm -f "${PENDING_COMMITS_FILE}"
+    exit "${curl_status}"
 }
 
 # Default to decoding the output filename

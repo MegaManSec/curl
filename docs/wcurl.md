@@ -53,7 +53,8 @@ By default, **wcurl** does:
 ## * Automatically choose a filename as output;
 
 ## * Avoid overwriting files
-    if the installed curl's version is \>= 7.83.0 (--no-clobber);
+    using curl's --no-clobber if the installed curl's version is \>= 7.83.0,
+    or a built-in equivalent otherwise;
 
 ## * Perform retries;
 
