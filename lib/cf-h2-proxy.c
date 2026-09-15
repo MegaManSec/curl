@@ -1032,7 +1032,7 @@ out:
     cf->connected = TRUE;
     /* The real request will follow the CONNECT, reset request partially */
     Curl_req_soft_reset(&data->req, data);
-    Curl_client_reset(data);
+    (void)Curl_client_reset(data);
   }
   CF_DATA_RESTORE(cf, save);
   return result;

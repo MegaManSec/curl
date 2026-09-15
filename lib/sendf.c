@@ -44,16 +44,22 @@
 #include "multiif.h"
 #include "progress.h"
 
-static void cl_reset_writer(struct Curl_easy *data)
+static CURLcode cl_reset_writer(struct Curl_easy *data)
 {
   struct Curl_cwriter *writer = data->req.writer.stack;
+  CURLcode result = CURLE_OK;
+
   while(writer) {
+    CURLcode close_result;
     data->req.writer.stack = writer->next;
-    writer->cwt->do_close(data, writer);
+    close_result = writer->cwt->do_close(data, writer);
+    if(close_result && !result)
+      result = close_result;
     curlx_free(writer);
     writer = data->req.writer.stack;
   }
   data->req.writer.paused = FALSE;
+  return result;
 }
 
 static void cl_reset_reader(struct Curl_easy *data)
@@ -71,14 +77,16 @@ static void cl_reset_reader(struct Curl_easy *data)
 void Curl_client_cleanup(struct Curl_easy *data)
 {
   cl_reset_reader(data);
-  cl_reset_writer(data);
+  (void)cl_reset_writer(data);
 
   data->req.bytecount = 0;
   data->req.headerline = 0;
 }
 
-void Curl_client_reset(struct Curl_easy *data)
+CURLcode Curl_client_reset(struct Curl_easy *data)
 {
+  CURLcode result;
+
   if(data->req.rewind_read) {
     /* already requested */
     CURL_TRC_READ(data, "client_reset, will rewind reader");
@@ -87,10 +95,11 @@ void Curl_client_reset(struct Curl_easy *data)
     CURL_TRC_READ(data, "client_reset, clear readers");
     cl_reset_reader(data);
   }
-  cl_reset_writer(data);
+  result = cl_reset_writer(data);
 
   data->req.bytecount = 0;
   data->req.headerline = 0;
+  return result;
 }
 
 CURLcode Curl_client_start(struct Curl_easy *data)
@@ -146,11 +155,12 @@ CURLcode Curl_cwriter_def_flush(struct Curl_easy *data,
   return Curl_cwriter_flush(data, writer->next);
 }
 
-void Curl_cwriter_def_close(struct Curl_easy *data,
-                            struct Curl_cwriter *writer)
+CURLcode Curl_cwriter_def_close(struct Curl_easy *data,
+                                struct Curl_cwriter *writer)
 {
   (void)data;
   (void)writer;
+  return CURLE_OK;
 }
 
 static size_t get_max_body_write_len(struct Curl_easy *data, curl_off_t limit)

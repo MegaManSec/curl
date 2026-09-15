@@ -88,12 +88,14 @@ static void cw_pause_bufs_free(struct cw_pause_ctx *ctx)
   }
 }
 
-static void cw_pause_close(struct Curl_easy *data, struct Curl_cwriter *writer)
+static CURLcode cw_pause_close(struct Curl_easy *data,
+                               struct Curl_cwriter *writer)
 {
   struct cw_pause_ctx *ctx = writer->ctx;
 
   (void)data;
   cw_pause_bufs_free(ctx);
+  return CURLE_OK;
 }
 
 static CURLcode cw_pause_flush(struct Curl_easy *data,

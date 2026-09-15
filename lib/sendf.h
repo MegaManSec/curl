@@ -71,9 +71,11 @@ void Curl_client_cleanup(struct Curl_easy *data);
 
 /**
  * Reset readers and writer chains, keep rewind information
- * when necessary.
+ * when necessary. Invokes `writer->do_close()` on each writer, which
+ * gets a final chance to report that it did not receive a complete,
+ * valid stream.
  */
-void Curl_client_reset(struct Curl_easy *data);
+CURLcode Curl_client_reset(struct Curl_easy *data);
 
 /**
  * A new request is starting, perform any ops like rewinding
@@ -125,8 +127,8 @@ struct Curl_cwtype {
                        const char *buf, size_t nbytes);
   CURLcode (*do_flush)(struct Curl_easy *data,
                        struct Curl_cwriter *writer);
-  void (*do_close)(struct Curl_easy *data,
-                   struct Curl_cwriter *writer);
+  CURLcode (*do_close)(struct Curl_easy *data,
+                       struct Curl_cwriter *writer);
   size_t cwriter_size;  /* sizeof() allocated struct Curl_cwriter */
 };
 
@@ -209,8 +211,8 @@ CURLcode Curl_cwriter_def_write(struct Curl_easy *data,
                                 const char *buf, size_t nbytes);
 CURLcode Curl_cwriter_def_flush(struct Curl_easy *data,
                                 struct Curl_cwriter *writer);
-void Curl_cwriter_def_close(struct Curl_easy *data,
-                            struct Curl_cwriter *writer);
+CURLcode Curl_cwriter_def_close(struct Curl_easy *data,
+                                struct Curl_cwriter *writer);
 
 typedef enum {
   CURL_CRCNTRL_REWIND,

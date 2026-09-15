@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP GET
+compressed
+</keywords>
+</info>
+# Server-side
+<reply>
+<data crlf="headers" nonewline="yes" nocheck="yes">
+HTTP/1.1 200 OK
+Date: Mon, 29 Nov 2004 21:56:53 GMT
+Server: Apache/1.3.31 (Debian GNU/Linux) mod_gzip/1.3.26.1a PHP/4.3.9-1 mod_ssl/2.8.20 OpenSSL/0.9.7d mod_perl/1.29
+Vary: Accept-Encoding
+Content-Type: text/html; charset=ISO-8859-1
+Content-Encoding: gzip
+Content-Length: 800
+
+%hex[%1f%8b%08%00%00%00%00%00%00%ff%dd%58%df%4f%eb%36%14%7e%e7%af%f0%2a%4d%da%a4%36%bf%da%42%8a%4a%ae%26%e0%0e%b4%de%81%68%27%ed%3e%55%6e%e2%b6%1e%49%1c%d9%4e%a1%3c%ec%6f%df%71%e2%24%a6%29%bd%bd%17%ed%05%09%a8%7d%ce%f7%7d%3e%3e%c7%76%6d%c6%9f%9e%93%18%6d%08%17%94%a5%17%1d%d7%72%3a%88%a4%21%8b%68%ba%ba%e8%dc%4e%ef%7a%be%3f%1c%f5%dc%ce%a7%e0%64%fc%d3%d5%dd%e5%ec%eb%fd%35%ca%38%fb%87%84%b2%17%53%21%01%88%a6%5f%a7%b3%eb%2f%a8%b3%96%32%3b%b7%ed%25%27%62%9d%10%2c%ad%94%48%7b%81%c3%47%92%46%f6%32%e9%69%9e%e8%39%d6%c0%8a%64%d4%01%d1%1d%ad%e0%04%a1%ca%a6%da%4d%6f%4e%a3%c0%3d%75%bd%b1%6d%18%4a%44%84%25%99%e3%28%22%80%18%8d%fc%9e%e3%f7%3c%17%39%83%73%c7%3d%f7%46%63%db%f0%1b%84%3c%53%1f%51%e0%39%ce%a0%e7%3a%3d%d7%47%8e%77%ee%c1%4f%5f%53%2a%c4%ab%38%52%9c%90%b9%58%33%2e%83%30%e7%71%1d%8e%61%6f%e3%97%79%1c%17%70%84%d3%08%c5%74%d1%a6%16%10%1d%1e%11%a1%96%ba%64%49%52%52%52%82%24%63%b5%00%c7%7c%8b%96%8c%a3%30%a6%24%95%3d%41%23%82%fe%7a%98%20%c9%71%2a%96%50%51%0b%66%d1%08%19%ca%7b%83%41%54%20%5c%8e%a0%54%2b%15%ae%ea%bb%a4%31%11%3f%5f%3e%9c%e4%42%75%d5%28%62%9b%4a%fc%6c%a1%5b%89%44%9e%65%30%82%40%37%b3%d9%7d%b7%f8%3b%ed%a2%cf%d0%56%94%cf%45%ef%ea%f6%72%d6%45%b3%eb%c9%9f%d7%f0%39%b9%fa%0d%80%9f%6f%27%d7%dd%22%84%df%ef%ee%6f%ae%1f%a0%5d%0c%f2%44%62%88%ac%94%eb%65%4c%c8%ae%6e%e6%d0%0a%19%7b%a4%44%14%fa%28%cf%62%86%a3%62%18%58%72%79%42%a2%66%f6%5d%94%61%21%9e%18%8f%54%13%e2%4b%f3%64%51%d8%a7%d3%89%62%84%84%4b%ba%a4%21%54%18%8c%7f%10%0e%5e%26%ca%80%a0%2e%cf%30%4a%31%3d%c8%4b%c6%9e%08%27%91%62%2d%b6%55%c2%ba%48%ae%c9%9b%d9%af%4a%64%29%d2%6c%0d%74%84%e1%77%41%53%b5%b5%04%24%ba%4e%bc%4a%37%83%2d%88%3c%47%81%63%9c%ae%72%bc%22%a2%88%84%a4%1b%ca%59%9a%c0%20%a2%d0%d2%45%35%56%cb%86%4a%1c%53%b9%9d%8b%90%71%12%0c%cf%fc%81%35%3c%1b%db%3b%f6%1d%70%46%78%08%a2%41%df%72%4f%0d%6c%65%de%41%c3%ac%1e%61%f7%8d%0c%64%61%d2%2b%9d%65%79%8c%79%33%d6%e9%70%04%31%0c%60%81%ef%7a%5a%84%6a%40%b7%6f%f9%ee%2b%c2%eb%50%0c%47%19%8c%33%7c%85%36%c2%e1%b8%38%49%7c%6b%e8%8c%6d%dd%31%3d%f3%90%e5%a0%eb%b9%95%57%1b%5e%61%ca%41%fc%7e%8d%31%06%10%f9%42%84%9c%66%12%0e%4d%11%f4%d5%79%f1%da%54%c2%60%01%a4%e1%7a%ae%76%77%70%45%96%38%8f%e5%d8%36%8d%25%0c%d6%c0%bc%3a%d2%32%28%7c%b0%f7%18%ad%ce%4e%5b%ad%19%7b%6c%b7%58%8d%d8%9a%25%e4%6d%21%58%c8%94%97%2a%ea%38%b5%4d%86%d6%ad%05%1a%4d%b9%7a%39%5e%0e%c0%5a%49%d1%1a%91%c5%8b%77%bc%08%80%b5%88%a2%35%22%2f%34%3b%5e%04%c0%5a%44%d1%1a%91%70%0d%bb%8c%c4%6c%75%bc%54%4d%d1%82%8d%44%23%cb%b3%e4]hex%
+</data>
+
+# The gzip stream is well-formed but was cut off at 800 of 1305 bytes.
+# Content-Length matches the truncated body exactly, so the HTTP framing
+# is intact; only the compressed payload inside is incomplete.
+
+</reply>
+
+# Client-side
+<client>
+<features>
+libz
+</features>
+<server>
+http
+</server>
+<name>
+HTTP GET gzip compressed content truncated mid-stream
+</name>
+<command>
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER --compressed
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<strippart>
+s/^Accept-Encoding: [a-zA-Z, ]*/Accept-Encoding: xxx/
+</strippart>
+<protocol crlf="headers">
+GET /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+Accept-Encoding: xxx
+
+</protocol>
+<errorcode>
+61
+</errorcode>
+</verify>
+</testcase>
