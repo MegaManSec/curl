@@ -9,6 +9,7 @@ See-also:
   - CURLOPT_CAINFO (3)
   - CURLOPT_CAINFO_BLOB (3)
   - CURLOPT_SSL_CTX_DATA (3)
+  - CURLOPT_SSL_SESSIONID_CACHE (3)
   - CURLOPT_SSL_VERIFYHOST (3)
   - CURLOPT_SSL_VERIFYPEER (3)
 Protocol:
@@ -83,11 +84,13 @@ the specific transfer the callback verifies, it should be marked unsuitable
 for reuse with CURLOPT_FORBID_REUSE(3).
 
 We strongly discourage setting a client certificate with this option, or any
-other sensitive data. The application must prevent both connection and TLS
-session reuse when these settings should not outlive the transfer. In addition
-to setting CURLOPT_FORBID_REUSE(3), set CURLOPT_SSL_SESSIONID_CACHE(3) to 0
-because a new connection can resume a session established with these settings
-even though the callback is invoked again.
+other sensitive data. The application must prevent connection reuse when
+these settings should not outlive the transfer, by setting
+CURLOPT_FORBID_REUSE(3). Since libcurl cannot know what identity, if any,
+the callback installs into the SSL library's context, libcurl does not use
+the TLS session cache (for storing or resuming sessions) for a transfer that
+sets this callback, regardless of CURLOPT_SSL_SESSIONID_CACHE(3). (Since
+8.23.0)
 
 If you are using DNS-over-HTTPS (DoH) via CURLOPT_DOH_URL(3) then this
 callback is also called for those transfers and the curl handle is set to an

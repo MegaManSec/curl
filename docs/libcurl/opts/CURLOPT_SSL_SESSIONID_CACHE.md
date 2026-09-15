@@ -8,6 +8,7 @@ See-also:
   - CURLOPT_DNS_CACHE_TIMEOUT (3)
   - CURLOPT_MAXAGE_CONN (3)
   - CURLOPT_MAXLIFETIME_CONN (3)
+  - CURLOPT_SSL_CTX_FUNCTION (3)
   - CURLOPT_SSLVERSION (3)
 Protocol:
   - TLS
@@ -36,6 +37,9 @@ this to 1 to enable it. By default all transfers are done using the cache
 enabled. While nothing ever should get hurt by attempting to reuse SSL
 session-IDs, there seem to be or have been broken SSL implementations in the
 wild that may require you to disable this in order for you to succeed.
+
+libcurl never uses the session cache for a transfer that sets
+CURLOPT_SSL_CTX_FUNCTION(3), regardless of this option.
 
 # DEFAULT
 

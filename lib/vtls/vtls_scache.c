@@ -675,6 +675,8 @@ void Curl_ssl_scache_destroy(struct Curl_ssl_scache *scache)
 
 bool Curl_ssl_scache_use(struct Curl_cfilter *cf, struct Curl_easy *data)
 {
+  if(data->set.ssl_fsslctx)
+    return FALSE;
   if(cf_ssl_scache_get(data)) {
     struct ssl_filter_config *conn_config =
       Curl_ssl_cf_get_filter_config(cf);
