@@ -1133,6 +1133,61 @@ static void cr_set_negotiated_alpn(struct Curl_cfilter *cf,
   Curl_alpn_set_negotiated(cf, data, connssl, protocol, len);
 }
 
+static CURLcode cr_check_pinned_pubkey(struct Curl_cfilter *cf,
+                                       struct Curl_easy *data,
+                                       const struct rustls_connection *rconn)
+{
+  const char *pinnedpubkey =
+#ifndef CURL_DISABLE_PROXY
+    Curl_ssl_cf_is_proxy(cf) ?
+    CURL_EASY_STR(data, STRING_SSL_PINNEDPUBLICKEY_PROXY) :
+#endif
+    CURL_EASY_STR(data, STRING_SSL_PINNEDPUBLICKEY);
+  const rustls_certificate *cert;
+  struct Curl_X509certificate x509_parsed;
+  struct Curl_asn1Element *pubkey;
+  const unsigned char *der_data;
+  size_t der_len;
+  rustls_result rr;
+  CURLcode result;
+
+  if(!pinnedpubkey)
+    return CURLE_OK;
+
+  cert = rustls_connection_get_peer_certificate(rconn, 0);
+  if(!cert) {
+    failf(data, "rustls: failed to get peer certificate for pinning");
+    return CURLE_SSL_PINNEDPUBKEYNOTMATCH;
+  }
+
+  rr = rustls_certificate_get_der(cert, &der_data, &der_len);
+  if(rr != RUSTLS_RESULT_OK) {
+    rustls_failf(data, rr, "rustls: failed getting DER of server "
+                 "certificate for pinning");
+    return map_error(rr);
+  }
+
+  memset(&x509_parsed, 0, sizeof(x509_parsed));
+  if(Curl_parseX509(&x509_parsed, der_data, der_data + der_len)) {
+    failf(data, "rustls: failed parsing server certificate for pinning");
+    return CURLE_SSL_PINNEDPUBKEYNOTMATCH;
+  }
+
+  pubkey = &x509_parsed.subjectPublicKeyInfo;
+  if(!pubkey->header || pubkey->end <= pubkey->header) {
+    failf(data, "rustls: failed retrieving public key from server "
+          "certificate");
+    return CURLE_SSL_PINNEDPUBKEYNOTMATCH;
+  }
+
+  result = Curl_pin_peer_pubkey(data, pinnedpubkey,
+                                (const unsigned char *)pubkey->header,
+                                (size_t)(pubkey->end - pubkey->header));
+  if(result)
+    failf(data, "SSL: public key does not match pinned public key");
+  return result;
+}
+
 /* Given an established network connection, do a TLS handshake.
  *
  * This function sets `*done` to true once the handshake is complete.
@@ -1260,6 +1315,10 @@ static CURLcode cr_connect(struct Curl_cfilter *cf, struct Curl_easy *data,
             return result;
         }
       }
+
+      result = cr_check_pinned_pubkey(cf, data, rconn);
+      if(result)
+        return result;
 
       connssl->state = ssl_connection_complete;
       *done = TRUE;
@@ -1433,7 +1492,8 @@ const struct Curl_ssl Curl_ssl_rustls = {
   SSLSUPP_TLS13_CIPHERSUITES |
   SSLSUPP_CERTINFO |
   SSLSUPP_ECH |
-  SSLSUPP_CRLFILE,
+  SSLSUPP_CRLFILE |
+  SSLSUPP_PINNEDPUBKEY,
   sizeof(struct rustls_ssl_backend_data),
 
   NULL,                            /* init */
