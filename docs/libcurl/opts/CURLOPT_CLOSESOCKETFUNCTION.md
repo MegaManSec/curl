@@ -60,6 +60,12 @@ associated socket may outlive the easy handle that created it, so that libcurl
 can still invoke it when the socket is closed even after that handle has been
 cleaned up.
 
+This callback may get called while libcurl is scanning a connection pool
+that is shared between several easy or multi handles (via
+CURLOPT_SHARE(3)). If the callback itself starts a transfer that reuses
+that same pool, that transfer is not able to reuse an existing connection
+from it and instead creates a new one.
+
 # DEFAULT
 
 Use the standard socket close function.

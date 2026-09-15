@@ -559,6 +559,7 @@ CURLcode Curl_cpool_add(struct Curl_easy *data,
   CURLcode result = CURLE_OK;
   struct cpool_bundle *bundle = NULL;
   struct cpool *cpool = cpool_get_instance(data);
+  bool do_lock;
   DEBUGASSERT(conn);
 
   DEBUGASSERT(cpool);
@@ -569,7 +570,10 @@ CURLcode Curl_cpool_add(struct Curl_easy *data,
   conn->shutdown.start_ms[FIRSTSOCKET] =
     conn->shutdown.start_ms[SECONDARYSOCKET] = -1;
 
-  CPOOL_LOCK(cpool, data);
+  /* may be called from a callback already under lock */
+  do_lock = !CPOOL_IS_LOCKED(cpool);
+  if(do_lock)
+    CPOOL_LOCK(cpool, data);
   bundle = cpool_find_bundle(cpool, conn->destination);
   if(!bundle) {
     bundle = cpool_add_bundle(cpool, conn->destination);
@@ -586,7 +590,8 @@ CURLcode Curl_cpool_add(struct Curl_easy *data,
              "The cache now contains %zu members",
              conn->connection_id, cpool->num_conn);
 out:
-  CPOOL_UNLOCK(cpool, data);
+  if(do_lock)
+    CPOOL_UNLOCK(cpool, data);
 
   return result;
 }
@@ -715,6 +720,11 @@ bool Curl_cpool_find(struct Curl_easy *data,
   if(!cpool)
     return FALSE;
 
+  /* do not scan a pool that is already being scanned further up the
+   * call stack, e.g. when a closesocket callback reenters libcurl */
+  if(CPOOL_IS_LOCKED(cpool))
+    return FALSE;
+
   CPOOL_LOCK(cpool, data);
   bundle = Curl_hash_pick(&cpool->dest2bundle,
                           destination, strlen(destination) + 1);
@@ -796,6 +806,11 @@ void Curl_cpool_prune_dead(struct cpool *cpool,
   timediff_t elapsed;
 
   if(!cpool)
+    return;
+
+  /* do not scan a pool that is already being scanned further up the
+   * call stack, e.g. when a closesocket callback reenters libcurl */
+  if(CPOOL_IS_LOCKED(cpool))
     return;
 
   admin = Curl_get_admin(data);
