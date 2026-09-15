@@ -1251,6 +1251,7 @@ static CURLcode imap_state_listsearch_resp(struct Curl_easy *data,
         struct pingpong *pp = &imapc->pp;
         size_t buffer_len = curlx_dyn_len(&pp->recvbuf);
         size_t after_header = buffer_len - pp->nfinal;
+        curl_off_t remaining = size;
 
         /* This is a literal response, setup to receive the body data */
         infof(data, "Found %" FMT_OFF_T " bytes to download", size);
@@ -1271,8 +1272,8 @@ static CURLcode imap_state_listsearch_resp(struct Curl_easy *data,
           pp->nfinal = 0; /* done */
 
           /* Limit chunk to the literal size */
-          if(chunk > (size_t)size)
-            chunk = (size_t)size;
+          if(chunk > (size_t)remaining)
+            chunk = (size_t)remaining;
 
           if(chunk) {
             /* Write the literal body data */
@@ -1280,6 +1281,7 @@ static CURLcode imap_state_listsearch_resp(struct Curl_easy *data,
                                        curlx_dyn_ptr(&pp->recvbuf), chunk);
             if(result)
               return result;
+            remaining -= chunk;
           }
 
           /* Handle remaining data in buffer (either more literal data or
@@ -1309,15 +1311,14 @@ static CURLcode imap_state_listsearch_resp(struct Curl_easy *data,
         /* Progress size includes both header line and literal body */
         Curl_pgrsSetDownloadSize(data, size);
 
-        if(data->req.bytecount == size)
+        if(!remaining)
           /* All data already transferred (header + literal body) */
           Curl_xfer_setup_nop(data);
         else {
-          /* Setup to receive the literal body data.
-             maxdownload and transfer size include both header line and
-             literal body */
-          data->req.maxdownload = size;
-          Curl_xfer_setup_recv(data, FIRSTSOCKET, size);
+          /* maxdownload is an absolute count, covering bytes already
+             received earlier in this response plus what remains */
+          data->req.maxdownload = data->req.bytecount + remaining;
+          Curl_xfer_setup_recv(data, FIRSTSOCKET, data->req.maxdownload);
         }
         /* End of DO phase */
         imap_state(data, imapc, IMAP_STOP);
