@@ -3285,13 +3285,15 @@ CURLcode Curl_ssl_setup_x509_store(struct Curl_cfilter *cf,
 
   /* Consider the X509 store cacheable if it comes exclusively from a CAfile,
      or no source is provided and we are falling back to OpenSSL's built-in
-     default. */
+     default, and no SSL CTX callback is set that could mutate the shared
+     store. */
   cache_criteria_met = (data->set.ssl_ca_cache_timeout != 0) &&
     conn_config->verifypeer &&
     !conn_config->CApath &&
     !conn_config->ca_info_blob &&
     !conn_config->CRLfile &&
-    !conn_config->native_ca_store;
+    !conn_config->native_ca_store &&
+    !data->set.ssl_fsslctx;
 
   ERR_set_mark();
 
