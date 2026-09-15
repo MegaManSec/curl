@@ -2484,10 +2484,38 @@ static CURLcode ssh_state_session_disconnect(struct Curl_easy *data,
   return CURLE_OK;
 }
 
+#define SSHC_CLEANUP_TIMEOUT_MS 1000
+
+/* Return the milliseconds left of the single teardown budget that was
+   established when sshc_cleanup() started blocking, clamped to at least
+   1ms so a libssh2 call is never given an infinite (0) timeout. */
+static long sshc_cleanup_timeout_ms(const struct curltime *start,
+                                    timediff_t budget_ms)
+{
+  struct curltime now = curlx_now();
+  timediff_t left_ms = budget_ms - curlx_ptimediff_ms(&now, start);
+  if(left_ms < 1)
+    left_ms = 1;
+  return (long)left_ms;
+}
+
 static CURLcode sshc_cleanup(struct ssh_conn *sshc, struct Curl_easy *data,
                              bool block)
 {
   int rc;
+  struct curltime start = {0};
+  timediff_t budget_ms = SSHC_CLEANUP_TIMEOUT_MS;
+
+  if(block && sshc->ssh_session) {
+    if(data) {
+      timediff_t left_ms = Curl_timeleft_ms(data);
+      if((left_ms > 0) && (left_ms < budget_ms))
+        budget_ms = left_ms;
+    }
+    start = curlx_now();
+    libssh2_session_set_timeout(sshc->ssh_session, (long)budget_ms);
+    libssh2_session_set_blocking(sshc->ssh_session, 1);
+  }
 
   if(sshc->kh) {
     libssh2_knownhost_free(sshc->kh);
@@ -2495,6 +2523,9 @@ static CURLcode sshc_cleanup(struct ssh_conn *sshc, struct Curl_easy *data,
   }
 
   if(sshc->ssh_agent) {
+    if(block && sshc->ssh_session)
+      libssh2_session_set_timeout(sshc->ssh_session,
+                                  sshc_cleanup_timeout_ms(&start, budget_ms));
     rc = libssh2_agent_disconnect(sshc->ssh_agent);
     if((rc < 0) && data) {
       char *err_msg = NULL;
@@ -2515,6 +2546,9 @@ static CURLcode sshc_cleanup(struct ssh_conn *sshc, struct Curl_easy *data,
   }
 
   if(sshc->sftp_handle) {
+    if(block && sshc->ssh_session)
+      libssh2_session_set_timeout(sshc->ssh_session,
+                                  sshc_cleanup_timeout_ms(&start, budget_ms));
     rc = libssh2_sftp_close(sshc->sftp_handle);
     if((rc < 0) && data) {
       char *err_msg = NULL;
@@ -2528,6 +2562,9 @@ static CURLcode sshc_cleanup(struct ssh_conn *sshc, struct Curl_easy *data,
   }
 
   if(sshc->ssh_channel) {
+    if(block && sshc->ssh_session)
+      libssh2_session_set_timeout(sshc->ssh_session,
+                                  sshc_cleanup_timeout_ms(&start, budget_ms));
     rc = libssh2_channel_free(sshc->ssh_channel);
     if((rc < 0) && data) {
       char *err_msg = NULL;
@@ -2541,6 +2578,9 @@ static CURLcode sshc_cleanup(struct ssh_conn *sshc, struct Curl_easy *data,
   }
 
   if(sshc->sftp_session) {
+    if(block && sshc->ssh_session)
+      libssh2_session_set_timeout(sshc->ssh_session,
+                                  sshc_cleanup_timeout_ms(&start, budget_ms));
     rc = libssh2_sftp_shutdown(sshc->sftp_session);
     if((rc < 0) && data) {
       char *err_msg = NULL;
@@ -2554,6 +2594,9 @@ static CURLcode sshc_cleanup(struct ssh_conn *sshc, struct Curl_easy *data,
   }
 
   if(sshc->ssh_session) {
+    if(block)
+      libssh2_session_set_timeout(sshc->ssh_session,
+                                  sshc_cleanup_timeout_ms(&start, budget_ms));
     rc = libssh2_session_free(sshc->ssh_session);
     if((rc < 0) && data) {
       char *err_msg = NULL;
