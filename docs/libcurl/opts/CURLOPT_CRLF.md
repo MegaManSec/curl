@@ -32,6 +32,10 @@ CRLF newlines on transfers. Disable this option again by setting the value to
 
 This is a legacy option of questionable use.
 
+For SMTP, the line ending used for the DATA end-of-body marker and for
+dot-stuffing is not affected by this option: a line starting with a dot is
+escaped whether the line before it ended in CRLF or a bare LF.
+
 # DEFAULT
 
 0

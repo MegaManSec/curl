@@ -314,6 +314,7 @@ struct cr_eob_ctx {
   BIT(read_eos);  /* we read an EOS from the next reader */
   BIT(processed_eos);  /* we read and processed an EOS */
   BIT(eos);       /* we have returned an EOS */
+  BIT(crlf_eol);  /* n_eob's line start was a real CRLF, not a bare LF */
 };
 
 static CURLcode cr_eob_init(struct Curl_easy *data,
@@ -324,6 +325,7 @@ static CURLcode cr_eob_init(struct Curl_easy *data,
   /* The first char we read is the first on a line, as if we had
    * read CRLF before */
   ctx->n_eob = 2;
+  ctx->crlf_eol = TRUE;
   Curl_bufq_init2(&ctx->buf, (16 * 1024), 1, BUFQ_OPT_SOFT_LIMIT);
   return CURLE_OK;
 }
@@ -360,7 +362,8 @@ static CURLcode cr_eob_read(struct Curl_easy *data,
 
     ctx->read_eos = eos;
     if(nread) {
-      if(!ctx->n_eob && !memchr(buf, SMTP_EOB[0], nread)) {
+      if(!ctx->n_eob && !memchr(buf, SMTP_EOB[0], nread) &&
+         !memchr(buf, '\n', nread)) {
         /* not in the middle of a match, no EOB start found, pass */
         *pnread = nread;
         *peos = FALSE;
@@ -388,6 +391,14 @@ static CURLcode cr_eob_read(struct Curl_easy *data,
         if(buf[i] == SMTP_EOB[ctx->n_eob]) {
           /* matching another char of the EOB */
           ++ctx->n_eob;
+          if(ctx->n_eob == 2)
+            ctx->crlf_eol = TRUE;
+        }
+        else if(buf[i] == '\n') {
+          /* a bare LF starts a new line too, so a dot following it must
+             be stuffed the same way a dot following a CRLF would be */
+          ctx->n_eob = 2;
+          ctx->crlf_eol = FALSE;
         }
       }
 
@@ -410,11 +421,12 @@ static CURLcode cr_eob_read(struct Curl_easy *data,
     CURL_TRC_SMTP(data, "auto-ending mail body with '\\r\\n.\\r\\n'");
     switch(ctx->n_eob) {
     case 2:
-      /* seen a CRLF at the end, add the remainder */
-      eob = &SMTP_EOB[2];
+      /* seen a real CRLF at the end, add the remainder. A bare LF does
+         not count, the wire data still needs a CRLF of its own */
+      eob = ctx->crlf_eol ? &SMTP_EOB[2] : SMTP_EOB;
       break;
     case 3:
-      /* ended with '\r\n.', we should escape the last '.' */
+      /* ended with '<eol>.', we should escape the last '.' */
       eob = "." SMTP_EOB;
       break;
     default:
