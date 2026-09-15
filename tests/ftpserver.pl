@@ -150,6 +150,7 @@ my $datadelay;     # set if server should throttle data stream
 my $retrweirdo;    # set if FTP server should use RETRWEIRDO
 my $retrnosize;    # set if FTP server should use RETRNOSIZE
 my $retrsize;      # set if FTP server should use RETRSIZE
+my $retrnoeob;     # set if POP3 server should close before the EOB marker
 my $pasvbadip;     # set if FTP server should use PASVBADIP
 my $nosave;        # set if FTP server should not save uploaded data
 my $nodataconn;    # set if FTP srvr does not establish or accepts data channel
@@ -667,8 +668,7 @@ sub protocolsetup {
     }
 }
 
-# Perform the disconnect handshake with sockfilt on the secondary connection
-# (the only connection we actively disconnect).
+# Perform the disconnect handshake with sockfilt on the secondary connection.
 # This involves waiting for the disconnect acknowledgment after the DISC
 # command, while throwing away anything else that might come in before
 # that.
@@ -709,6 +709,54 @@ sub disc_handshake {
     elsif($nr <= 0) {
         logmsg "Error: pipe EOF while waiting for ACKD";
     }
+}
+
+# Perform the disconnect handshake with sockfilt on the primary connection,
+# then let the primary sockfilt quit and end this server process. Used to
+# simulate a server or on-path attacker closing the connection unexpectedly.
+sub main_disc_and_exit {
+    print SFWRITE "DISC\n";
+    my $line;
+    my $nr;
+    while(5 == ($nr = sysread SFREAD, $line, 5)) {
+        if($line eq "DATA\n") {
+            # Must read the data bytes to stay in sync
+            my $i;
+            sysread SFREAD, $i, 5;
+
+            my $size = 0;
+            if($i =~ /^([0-9a-fA-F]{4})\n/) {
+                $size = hex($1);
+            }
+
+            logmsg "> Throwing away $size bytes on closed connection\n";
+            read_mainsockf(\$line, $size);
+        }
+        elsif($line eq "ACKD\n") {
+            # Got the ack we were waiting for
+            last;
+        }
+        else {
+            logmsg "Ignoring: $line";
+            # sockfilt should not be sending us any other commands
+        }
+    }
+    if(!defined($nr)) {
+        logmsg "Error: pipe read error ($!) while waiting for ACKD";
+    }
+    elsif($nr <= 0) {
+        logmsg "Error: pipe EOF while waiting for ACKD";
+    }
+
+    print SFWRITE "QUIT\n";
+    pidwait(processexists($mainsockf_pidfile), 0);
+    unlink($mainsockf_pidfile) if(-f $mainsockf_pidfile);
+    unlink($pidfile);
+    if($serverlogslocked) {
+        $serverlogslocked = 0;
+        clear_advisor_read_lock($serverlogs_lockfile);
+    }
+    exit;
 }
 
 sub close_dataconn {
@@ -1851,6 +1899,13 @@ sub RETR_pop3 {
         sendcontrol $d;
     }
 
+    if($retrnoeob) {
+        # close the connection before sending the end of mail marker, to
+        # simulate a server or on-path attacker truncating the message
+        logmsg "RETR_pop3: closing connection without sending EOB\n";
+        main_disc_and_exit();
+    }
+
     # end with the magic 3-byte end of mail marker, assumes that the
     # mail body ends with a CRLF!
     sendcontrol ".\r\n";
@@ -2812,6 +2867,7 @@ sub customize {
     $retrweirdo = 0;    # default is no use of RETRWEIRDO
     $retrnosize = 0;    # default is no use of RETRNOSIZE
     $retrsize = 0;      # default is no use of RETRSIZE
+    $retrnoeob = 0;     # default is no use of RETRNOEOB
     $pasvbadip = 0;     # default is no use of PASVBADIP
     $nosave = 0;        # default is to actually save uploaded data to file
     $nodataconn = 0;    # default is to establish or accept data channel
@@ -2887,6 +2943,10 @@ sub customize {
         elsif($_ =~ /RETRSIZE (\d+)/) {
             $retrsize = $1;
             logmsg "FTPD: instructed to use RETRSIZE = $1\n";
+        }
+        elsif($_ =~ /RETRNOEOB/) {
+            logmsg "FTPD: instructed to use RETRNOEOB\n";
+            $retrnoeob = 1;
         }
         elsif($_ =~ /PASVBADIP/) {
             logmsg "FTPD: instructed to use PASVBADIP\n";
