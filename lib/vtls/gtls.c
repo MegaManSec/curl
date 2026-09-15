@@ -161,6 +161,9 @@ static int gtls_init(void)
   gnutls_global_set_log_function(tls_log_func);
   gnutls_global_set_log_level(2);
 #endif
+#ifdef CURL_GNUTLS_EARLY_DATA
+  Curl_tls_keylog_open();
+#endif
   return ret;
 }
 
@@ -1184,8 +1187,6 @@ CURLcode Curl_gtls_ctx_init(struct gtls_ctx *gctx,
   }
 
 #ifdef CURL_GNUTLS_EARLY_DATA
-  /* Open the file if a TLS or QUIC backend has not done this before. */
-  Curl_tls_keylog_open();
   if(Curl_tls_keylog_enabled()) {
     gnutls_session_set_keylog_function(gctx->session, keylog_callback);
   }
