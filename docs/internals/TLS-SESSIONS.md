@@ -60,10 +60,14 @@ One important thing: peer keys do not contain confidential information.
 Peer keys carry the hostnames you use curl for. They *do* leak the privacy of
 your communication. We recommend to *not* persist peer keys for this reason.
 
-**Caveat**: The key may contain filenames or paths. It does not reflect the
-*contents* in the file system. If you change `/etc/ssl/cert.pem` and reuse
-a previous ticket, curl might trust a server which no longer has a root
-certificate in the file.
+**Caveat**: The key may contain filenames or paths. For CAfile, CApath,
+CRLfile and issuercert, it also carries the mtime and size of the file or
+directory at the time the key was built, so replacing one of those files
+invalidates cached sessions from before the change. This is a cheap
+signal, not a content hash: a CApath directory whose entries are edited
+in place without changing the directory's own mtime, or a replacement
+file that happens to get the exact same mtime and size as the original,
+is not detected.
 
 ## Session Cache Access
 

@@ -42,6 +42,7 @@
 #include "curl_sha256.h"
 #include "rand.h"
 #include "curlx/strdup.h"
+#include "curlx/win32-fopen.h"
 
 /* a peer+tls-config we cache sessions for */
 struct Curl_ssl_scache_peer {
@@ -63,6 +64,16 @@ struct Curl_ssl_scache_peer {
 
 #define GOOD_SCACHE(x) ((x) && (x)->magic == CURL_SCACHE_MAGIC)
 
+static CURLcode cf_ssl_peer_key_add_stat(struct dynbuf *buf,
+                                         const char *path)
+{
+  curlx_struct_stat st;
+  if(curlx_stat(path, &st))
+    return CURLE_OK;
+  return curlx_dyn_addf(buf, ":%" FMT_OFF_T "-%" FMT_OFF_T,
+                        (curl_off_t)st.st_mtime, (curl_off_t)st.st_size);
+}
+
 static CURLcode cf_ssl_peer_key_add_path(struct dynbuf *buf,
                                          const char *name,
                                          const char *path,
@@ -76,6 +87,8 @@ static CURLcode cf_ssl_peer_key_add_path(struct dynbuf *buf,
     char *abspath = _fullpath(NULL, path, 0);
     if(abspath) {
       CURLcode result = curlx_dyn_addf(buf, ":%s-%s", name, abspath);
+      if(!result)
+        result = cf_ssl_peer_key_add_stat(buf, abspath);
       /* !checksrc! disable BANNEDFUNC 1 */
       free(abspath); /* allocated by CRT, use system free() */
       return result;
@@ -86,6 +99,8 @@ static CURLcode cf_ssl_peer_key_add_path(struct dynbuf *buf,
       char *abspath = realpath(path, NULL);
       if(abspath) {
         CURLcode result = curlx_dyn_addf(buf, ":%s-%s", name, abspath);
+        if(!result)
+          result = cf_ssl_peer_key_add_stat(buf, abspath);
         /* !checksrc! disable BANNEDFUNC 1 */
         free(abspath); /* allocated by libc, free without memdebug */
         return result;
@@ -93,7 +108,12 @@ static CURLcode cf_ssl_peer_key_add_path(struct dynbuf *buf,
       *is_local = TRUE;
     }
 #endif
-    return curlx_dyn_addf(buf, ":%s-%s", name, path);
+    {
+      CURLcode result = curlx_dyn_addf(buf, ":%s-%s", name, path);
+      if(!result)
+        result = cf_ssl_peer_key_add_stat(buf, path);
+      return result;
+    }
   }
   return CURLE_OK;
 }
