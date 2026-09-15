@@ -1990,6 +1990,31 @@ out:
 }
 
 /*
+ * Curl_smtp_conns_match()
+ *
+ * Verify that a candidate connection was authenticated under a mechanism
+ * still allowed by the requested transfer's ";AUTH=" URL option, so that
+ * a stricter SASL mechanism restriction cannot be bypassed by reusing a
+ * connection authenticated under a weaker one.
+ */
+bool Curl_smtp_conns_match(struct connectdata *needle,
+                            struct connectdata *conn)
+{
+  struct smtp_conn *smtpc = Curl_conn_meta_get(conn, CURL_META_SMTP_CONN);
+  struct smtp_conn request;
+
+  if(!smtpc || !smtpc->sasl.authused)
+    return TRUE;
+
+  memset(&request, 0, sizeof(request));
+  if(smtp_parse_url_options(needle, &request))
+    return FALSE;
+
+  return !request.sasl.prefmech ||
+         !!(request.sasl.prefmech & smtpc->sasl.authused);
+}
+
+/*
  * SMTP protocol handler.
  */
 const struct Curl_protocol Curl_protocol_smtp = {

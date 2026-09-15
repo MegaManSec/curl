@@ -25,6 +25,9 @@
  ***************************************************************************/
 #ifndef CURL_DISABLE_SMTP
 extern const struct Curl_protocol Curl_protocol_smtp;
+
+bool Curl_smtp_conns_match(struct connectdata *needle,
+                            struct connectdata *conn);
 #endif
 
 #endif /* HEADER_CURL_SMTP_H */
