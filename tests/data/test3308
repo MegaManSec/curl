@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+TLS
+</keywords>
+</info>
+
+# Client-side
+<client>
+<features>
+unittest
+SSL
+</features>
+<name>
+TLS session export callback must not be able to poison the multi's scache
+</name>
+</client>
+</testcase>

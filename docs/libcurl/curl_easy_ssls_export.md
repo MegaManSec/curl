@@ -50,6 +50,10 @@ This function iterates over all SSL session tickets that belong to the
 easy handle and invokes the **export_fn** callback on each of them, as
 long as the callback returns **CURLE_OK**.
 
+The session cache stays locked for the duration of this call. **export_fn**
+must not call curl_multi_remove_handle(3) on *handle*; doing so fails with
+CURLM_RECURSIVE_API_CALL.
+
 The callback may then store this information and use curl_easy_ssls_import(3)
 in another libcurl instance to add SSL session tickets again. Reuse of
 SSL session tickets may result in faster handshakes and some connections

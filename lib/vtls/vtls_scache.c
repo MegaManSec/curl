@@ -683,10 +683,9 @@ bool Curl_ssl_scache_use(struct Curl_cfilter *cf, struct Curl_easy *data)
   return FALSE;
 }
 
-/* Lock shared SSL session data */
-void Curl_ssl_scache_lock(struct Curl_easy *data)
+static void cf_ssl_scache_lock_obj(struct Curl_easy *data,
+                                   struct Curl_ssl_scache *scache)
 {
-  struct Curl_ssl_scache *scache = cf_ssl_scache_get(data);
   if(scache) {
     if(CURL_SHARE_ssl_scache(data))
       Curl_share_lock(data, CURL_LOCK_DATA_SSL_SESSION,
@@ -704,10 +703,9 @@ void Curl_ssl_scache_lock(struct Curl_easy *data)
   }
 }
 
-/* Unlock shared SSL session data */
-void Curl_ssl_scache_unlock(struct Curl_easy *data)
+static void cf_ssl_scache_unlock_obj(struct Curl_easy *data,
+                                     struct Curl_ssl_scache *scache)
 {
-  struct Curl_ssl_scache *scache = cf_ssl_scache_get(data);
   if(scache) {
 #ifdef USE_MUTEX
     Curl_mutex_acquire(&scache->mutex);
@@ -722,6 +720,18 @@ void Curl_ssl_scache_unlock(struct Curl_easy *data)
     if(CURL_SHARE_ssl_scache(data))
       Curl_share_unlock(data, CURL_LOCK_DATA_SSL_SESSION);
   }
+}
+
+/* Lock shared SSL session data */
+void Curl_ssl_scache_lock(struct Curl_easy *data)
+{
+  cf_ssl_scache_lock_obj(data, cf_ssl_scache_get(data));
+}
+
+/* Unlock shared SSL session data */
+void Curl_ssl_scache_unlock(struct Curl_easy *data)
+{
+  cf_ssl_scache_unlock_obj(data, cf_ssl_scache_get(data));
 }
 
 bool Curl_ssl_scache_is_locked_by_current_thread(struct Curl_easy *data)
@@ -1296,7 +1306,7 @@ CURLcode Curl_ssl_session_export(struct Curl_easy *data,
   if(!export_fn)
     return CURLE_BAD_FUNCTION_ARGUMENT;
 
-  Curl_ssl_scache_lock(data);
+  cf_ssl_scache_lock_obj(data, scache);
 
   curlx_dyn_init(&hbuf, (CURL_SHA256_DIGEST_LENGTH * 2) + 1);
   curlx_dyn_init(&sbuf, CURL_SSL_TICKET_MAX);
@@ -1349,7 +1359,7 @@ CURLcode Curl_ssl_session_export(struct Curl_easy *data,
                 ntickets, npeers);
 
 out:
-  Curl_ssl_scache_unlock(data);
+  cf_ssl_scache_unlock_obj(data, scache);
   curlx_dyn_free(&hbuf);
   curlx_dyn_free(&sbuf);
   return result;
