@@ -357,3 +357,123 @@ class TestWebsockets:
         url = f'ws://localhost:{ws_4frames.port}/small'
         r = client.run(args=[url, payload])
         r.check_exit_code(0)
+
+    # A peer PING arriving while a curl_ws_send() call has only partially
+    # flushed its encoded frame must not desync ws->sendbuf_payload
+    # accounting. Once the application resumes the partial send, the wire
+    # must still show the single, intact frame it asked for, not a
+    # frame header with fewer payload bytes behind it than declared.
+    def test_20_15_ping_during_partial_send(self, env: Env):
+        run_env = os.environ.copy()
+        run_env['CURL_WS_CHUNK_EAGAIN'] = '3000'
+        client = LocalClient(env=env, name='cli_ws_ping_desync',
+                             run_env=run_env)
+        if not client.exists():
+            pytest.skip(f'example client not built: {client.name}')
+        if not env.curl_is_debug():
+            pytest.skip('CURL_WS_CHUNK_EAGAIN needs a debug build')
+
+        st = {}
+
+        def srv():
+            try:
+                with socket.socket() as s:
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    s.bind(("127.0.0.1", 0))
+                    s.listen(1)
+                    st["p"] = s.getsockname()[1]
+                    c, _ = s.accept()
+                    c.settimeout(Env.SERVER_TIMEOUT)
+                    req = b""
+                    while b"\r\n\r\n" not in req:
+                        req += c.recv(4096)
+                    k = re.search(rb"(?im)^Sec-WebSocket-Key:\s*(\S+)",
+                                 req).group(1)
+                    a = base64.b64encode(
+                        hashlib.sha1(
+                            k + b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+                        ).digest()
+                    ).decode()
+                    c.sendall((
+                        "HTTP/1.1 101 Switching Protocols\r\n"
+                        "Upgrade: websocket\r\n"
+                        "Connection: Upgrade\r\n"
+                        f"Sec-WebSocket-Accept: {a}\r\n\r\n"
+                    ).encode())
+                    # a PING (triggers an auto-PONG) followed by a small
+                    # TEXT frame, so curl_ws_recv() has something to
+                    # return once it is done auto-ponging.
+                    c.sendall(b"\x89\x00")
+                    c.sendall(b"\x81\x03hi!")
+                    # read the client's entire outbound frame stream to EOF
+                    c.settimeout(10)
+                    buf = b""
+                    try:
+                        while True:
+                            d = c.recv(65536)
+                            if not d:
+                                break
+                            buf += d
+                    except socket.timeout:
+                        pass
+                    st["stream"] = buf
+                    c.close()
+            except OSError as e:
+                st["err"] = e
+
+        threading.Thread(target=srv, daemon=True).start()
+        while "p" not in st and "err" not in st:
+            time.sleep(0.01)
+        assert "err" not in st, f'server failed to start: {st.get("err")}'
+
+        url = f'ws://127.0.0.1:{st["p"]}/'
+        r = client.run(args=[url])
+        r.check_exit_code(0)
+
+        end = time.time() + 10
+        while "stream" not in st and time.time() < end:
+            time.sleep(0.05)
+        assert "stream" in st, 'server never captured the client stream'
+
+        # Parse the client's (masked) frame stream. Every frame's declared
+        # payload length must be fully backed by actual bytes: a frame
+        # left declaring more payload than ever followed it is exactly
+        # the send-accounting desync this test guards against.
+        stream = st["stream"]
+        pos = 0
+        text_total = 0
+        text_payloads = []
+        while pos + 2 <= len(stream):
+            b1 = stream[pos + 1]
+            opcode = stream[pos] & 0x0f
+            plen = b1 & 0x7f
+            hp = pos + 2
+            if plen == 126:
+                assert hp + 2 <= len(stream), 'truncated extended length'
+                plen = int.from_bytes(stream[hp:hp + 2], 'big')
+                hp += 2
+            elif plen == 127:
+                assert hp + 8 <= len(stream), 'truncated extended length'
+                plen = int.from_bytes(stream[hp:hp + 8], 'big')
+                hp += 8
+            assert b1 & 0x80, 'client frames must be masked'
+            assert hp + 4 <= len(stream), 'truncated mask key'
+            mask = stream[hp:hp + 4]
+            hp += 4
+            avail = len(stream) - hp
+            assert avail >= plen, (
+                f'frame at offset {pos} declares {plen} payload bytes but '
+                f'only {avail} are available before EOF: the send '
+                f'accounting desynced')
+            payload = bytes(stream[hp + i] ^ mask[i % 4] for i in range(plen))
+            if opcode == 0x1:  # TEXT
+                text_total += plen
+                text_payloads.append(payload)
+            pos = hp + plen
+
+        assert text_total == 4000, (
+            f'expected a single intact 4000 byte TEXT message, got '
+            f'{text_total} bytes across {len(text_payloads)} frame(s)')
+        expected = bytes((ord('0') + (i % 10)) for i in range(4000))
+        assert b''.join(text_payloads) == expected, \
+            'TEXT message content corrupted'
