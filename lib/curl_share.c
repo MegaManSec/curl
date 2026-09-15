@@ -321,6 +321,10 @@ CURLSHcode curl_share_setopt(CURLSH *sh, CURLSHoption option, ...)
       break;
 
     case CURL_LOCK_DATA_CONNECT:
+      if(share->cpool.initialized) {
+        Curl_cpool_destroy(&share->cpool, share->admin);
+        share->cpool.initialized = FALSE;
+      }
       break;
 
     default:

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+share
+CURLSHOPT_UNSHARE
+</keywords>
+</info>
+
+<client>
+<features>
+unittest
+</features>
+<name>
+share CURLSHOPT_UNSHARE for CURL_LOCK_DATA_CONNECT drains and resets the connection pool
+</name>
+</client>
+</testcase>
