@@ -67,8 +67,10 @@ enum mqttstate {
   MQTT_SUBACK_COMING,     /* 4 - the SUBACK remainder */
   MQTT_PUBWAIT,    /* 5 - wait for publish */
   MQTT_PUB_REMAIN,  /* 6 - wait for the remainder of the publish */
+  MQTT_PUBLISH_REMAIN, /* 7 - wait for the queued PUBLISH+DISCONNECT to
+                           finish sending */
 
-  MQTT_NOSTATE /* 7 - never used an actual state */
+  MQTT_NOSTATE /* 8 - never used an actual state */
 };
 
 struct mqtt_conn {
@@ -140,21 +142,21 @@ static CURLcode mqtt_send(struct Curl_easy *data,
   if(!mq)
     return CURLE_FAILED_INIT;
 
+  if(buf) {
+    result = curlx_dyn_addn(&mq->sendbuf, buf, len);
+    if(result)
+      return result;
+  }
+  buf = curlx_dyn_ptr(&mq->sendbuf);
+  len = curlx_dyn_len(&mq->sendbuf);
+
   result = Curl_xfer_send(data, buf, len, FALSE, &n);
   if(result)
     return result;
   mq->lastTime = *Curl_pgrs_now(data);
   Curl_debug(data, CURLINFO_HEADER_OUT, buf, n);
-  if(len != n) {
-    size_t nsend = len - n;
-    if(curlx_dyn_len(&mq->sendbuf)) {
-      DEBUGASSERT(curlx_dyn_len(&mq->sendbuf) >= nsend);
-      result = curlx_dyn_tail(&mq->sendbuf, nsend); /* keep this much */
-    }
-    else {
-      result = curlx_dyn_addn(&mq->sendbuf, &buf[n], nsend);
-    }
-  }
+  if(len != n)
+    result = curlx_dyn_tail(&mq->sendbuf, len - n);
   else
     curlx_dyn_reset(&mq->sendbuf);
   return result;
@@ -166,7 +168,12 @@ static CURLcode mqtt_send(struct Curl_easy *data,
 static CURLcode mqtt_pollset(struct Curl_easy *data,
                              struct easy_pollset *ps)
 {
-  return Curl_pollset_add_in(data, ps, data->conn->sock[FIRSTSOCKET]);
+  struct MQTT *mq = Curl_meta_get(data, CURL_META_MQTT_EASY);
+  CURLcode result = Curl_pollset_add_in(data, ps,
+                                        data->conn->sock[FIRSTSOCKET]);
+  if(!result && mq && curlx_dyn_len(&mq->sendbuf))
+    result = Curl_pollset_add_out(data, ps, data->conn->sock[FIRSTSOCKET]);
+  return result;
 }
 
 static int mqtt_encode_len(char *buf, size_t len)
@@ -637,6 +644,7 @@ static const char * const statenames[] = {
   "MQTT_SUBACK_COMING",
   "MQTT_PUBWAIT",
   "MQTT_PUB_REMAIN",
+  "MQTT_PUBLISH_REMAIN",
 
   "NOT A STATE"
 };
@@ -843,8 +851,7 @@ static CURLcode mqtt_doing(struct Curl_easy *data, bool *done)
 
   if(curlx_dyn_len(&mq->sendbuf)) {
     /* send the remainder of an outgoing packet */
-    result = mqtt_send(data, curlx_dyn_ptr(&mq->sendbuf),
-                       curlx_dyn_len(&mq->sendbuf));
+    result = mqtt_send(data, NULL, 0);
     if(result)
       return result;
   }
@@ -937,9 +944,13 @@ static CURLcode mqtt_doing(struct Curl_easy *data, bool *done)
 
     if(data->state.httpreq == HTTPREQ_POST) {
       result = mqtt_publish(data);
-      if(!result) {
+      if(!result)
         result = mqtt_disconnect(data);
-        *done = TRUE;
+      if(!result) {
+        if(curlx_dyn_len(&mq->sendbuf))
+          mqstate(data, MQTT_PUBLISH_REMAIN, MQTT_NOSTATE);
+        else
+          *done = TRUE;
       }
       mqtt->nextstate = MQTT_FIRST;
     }
@@ -949,6 +960,11 @@ static CURLcode mqtt_doing(struct Curl_easy *data, bool *done)
         mqstate(data, MQTT_FIRST, MQTT_SUBACK);
       }
     }
+    break;
+
+  case MQTT_PUBLISH_REMAIN:
+    if(!curlx_dyn_len(&mq->sendbuf))
+      *done = TRUE;
     break;
 
   case MQTT_SUBACK:
