@@ -61,15 +61,25 @@ CURLcode Curl_uint32_tbl_resize(struct uint32_tbl *tbl, uint32_t nrows)
     return CURLE_BAD_FUNCTION_ARGUMENT;
   if(nrows != tbl->nrows) {
     void **rows = curlx_calloc(nrows, sizeof(void *));
+    uint32_t *gens;
     if(!rows)
       return CURLE_OUT_OF_MEMORY;
+    gens = curlx_calloc(nrows, sizeof(uint32_t));
+    if(!gens) {
+      curlx_free(rows);
+      return CURLE_OUT_OF_MEMORY;
+    }
     if(tbl->rows) {
       memcpy(rows, tbl->rows, (CURLMIN(nrows, tbl->nrows) * sizeof(void *)));
+      memcpy(gens, tbl->gens,
+             (CURLMIN(nrows, tbl->nrows) * sizeof(uint32_t)));
       if(nrows < tbl->nrows)
         uint32_tbl_clear_rows(tbl, nrows, tbl->nrows);
       curlx_free(tbl->rows);
+      curlx_free(tbl->gens);
     }
     tbl->rows = rows;
+    tbl->gens = gens;
     tbl->nrows = nrows;
   }
   return CURLE_OK;
@@ -93,6 +103,7 @@ void Curl_uint32_tbl_destroy(struct uint32_tbl *tbl)
   DEBUGASSERT(tbl->init == CURL_UINT32_TBL_MAGIC);
   uint32_tbl_clear(tbl);
   curlx_free(tbl->rows);
+  curlx_free(tbl->gens);
   memset(tbl, 0, sizeof(*tbl));
 }
 
@@ -111,6 +122,11 @@ void *Curl_uint32_tbl_get(struct uint32_tbl *tbl, uint32_t key)
   return (key < tbl->nrows) ? tbl->rows[key] : NULL;
 }
 
+uint32_t Curl_uint32_tbl_gen(struct uint32_tbl *tbl, uint32_t key)
+{
+  return (key < tbl->nrows) ? tbl->gens[key] : 0;
+}
+
 bool Curl_uint32_tbl_add(struct uint32_tbl *tbl, void *entry, uint32_t *pkey)
 {
   uint32_t key, start_pos;
@@ -126,6 +142,7 @@ bool Curl_uint32_tbl_add(struct uint32_tbl *tbl, void *entry, uint32_t *pkey)
   for(key = start_pos; key < tbl->nrows; ++key) {
     if(!tbl->rows[key]) {
       tbl->rows[key] = entry;
+      tbl->gens[key]++;
       tbl->nentries++;
       tbl->last_key_added = key;
       *pkey = key;
@@ -136,6 +153,7 @@ bool Curl_uint32_tbl_add(struct uint32_tbl *tbl, void *entry, uint32_t *pkey)
   for(key = 0; key < start_pos; ++key) {
     if(!tbl->rows[key]) {
       tbl->rows[key] = entry;
+      tbl->gens[key]++;
       tbl->nentries++;
       tbl->last_key_added = key;
       *pkey = key;

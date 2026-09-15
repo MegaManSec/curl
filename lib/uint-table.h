@@ -27,6 +27,8 @@
 
 struct uint32_tbl {
   void **rows;  /* array of void* holding entries */
+  uint32_t *gens;  /* generation of the entry currently or last held by
+                      each row, bumped every time the row is assigned */
   uint32_t nrows;  /* length of `rows` array */
   uint32_t nentries; /* entries in table */
   uint32_t last_key_added; /* UINT_MAX or last key added */
@@ -53,6 +55,13 @@ uint32_t Curl_uint32_tbl_count(struct uint32_tbl *tbl);
 
 /* Get the entry for key or NULL if not present */
 void *Curl_uint32_tbl_get(struct uint32_tbl *tbl, uint32_t key);
+
+/* Get the generation of the entry currently assigned to `key`. This value
+ * changes every time the row is (re)assigned via Curl_uint32_tbl_add(), so
+ * a `(key, generation)` pair captured earlier that no longer matches the
+ * current generation means the key has been recycled for another entry
+ * meanwhile. */
+uint32_t Curl_uint32_tbl_gen(struct uint32_tbl *tbl, uint32_t key);
 
 /* Add a new entry to the table and assign it a free key.
  * Returns FALSE if the table is full.
