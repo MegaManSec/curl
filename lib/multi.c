@@ -2119,13 +2119,16 @@ static CURLMcode multistate_performing(struct Curl_easy *data,
       }
       else
         follow = FOLLOW_RETRY;
-      (void)multi_done(data, CURLE_OK, FALSE);
-      /* multi_done() might return CURLE_GOT_NOTHING */
-      result = multi_follow(data, handler, newurl, follow);
+      result = multi_done(data, CURLE_OK, FALSE);
       if(!result) {
-        multistate(data, MSTATE_SETUP);
-        mresult = CURLM_CALL_MULTI_PERFORM;
+        result = multi_follow(data, handler, newurl, follow);
+        if(!result) {
+          multistate(data, MSTATE_SETUP);
+          mresult = CURLM_CALL_MULTI_PERFORM;
+        }
       }
+      else
+        *stream_errorp = TRUE;
     }
     else {
       /* after the transfer is done, go DONE */

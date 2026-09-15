@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP GET
+followlocation
+XFERINFOFUNCTION
+</keywords>
+</info>
+
+# Server-side
+<reply>
+<data crlf="headers" nocheck="yes">
+HTTP/1.1 302 Found
+Date: Tue, 09 Nov 2010 14:49:00 GMT
+Location: /%TESTNUMBER0002
+Content-Length: 6
+Connection: close
+
+hello
+
+</data>
+<data2 crlf="headers">
+HTTP/1.1 200 OK
+Date: Tue, 09 Nov 2010 14:49:00 GMT
+Content-Length: 7
+Connection: close
+
+leaked
+
+</data2>
+</reply>
+
+# Client-side
+<client>
+<server>
+http
+</server>
+<tool>
+lib%TESTNUMBER
+</tool>
+
+<name>
+XFERINFOFUNCTION abort on final progress call stops a pending redirect
+</name>
+
+<command>
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<protocol crlf="yes">
+GET /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+Accept: */*
+
+</protocol>
+<stdout>
+XFERINFOFUNCTION abort
+</stdout>
+<errorcode>
+42
+</errorcode>
+</verify>
+</testcase>
