@@ -194,10 +194,13 @@ static ULONG ldap_win_bind_auth(LDAP *server, const char *user,
       rc = LDAP_NO_MEMORY;
     }
   }
-  else {
+  else if(method) {
     /* proceed with current user credentials */
-    method = LDAP_AUTH_NEGOTIATE;
     rc = ldap_bind_s(server, NULL, NULL, method);
+  }
+  else {
+    /* anonymous bind */
+    rc = ldap_simple_bind_s(server, NULL, NULL);
   }
   return rc;
 }
