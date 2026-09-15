@@ -34,6 +34,9 @@
 
 #ifndef CURL_DISABLE_IMAP
 extern const struct Curl_protocol Curl_protocol_imap;
+
+bool Curl_imap_conns_match(struct connectdata *needle,
+                           struct connectdata *conn);
 #endif
 
 #endif /* HEADER_CURL_IMAP_H */
