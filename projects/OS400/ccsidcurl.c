@@ -734,8 +734,11 @@ static int Curl_formadd_convert(struct curl_forms *forms, int formx,
 
   curlx_dyn_init(&db, CURL_MAX_INPUT_LENGTH);
 
-  if(lengthx >= 0)
+  if(lengthx >= 0) {
+    if((ssize_t)forms[lengthx].value < 0)
+      return -1;
     len = (size_t)forms[lengthx].value;
+  }
 
   if(dyn_addn_CCSID(&db, forms[formx].value, len, ccsid, ASCII_CCSID))
     return -1;
