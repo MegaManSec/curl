@@ -38,7 +38,7 @@ prefixes:
 
 If `if!` or `ifhost!` is specified but the parameter does not match an existing
 interface, *CURLE_INTERFACE_FAILED* is returned from the libcurl function used
-to perform the transfer.
+to perform the transfer. Interface name matching is case-sensitive.
 
 libcurl does not support using network interface names for this option on
 Windows.

@@ -91,6 +91,92 @@ unsigned int Curl_ipv6_scope(const struct sockaddr *sa)
 
 #ifdef HAVE_GETIFADDRS
 
+/* @unittest 1688 */
+UNITTEST if2ip_result_t if2ip_scan(struct ifaddrs *head, int af,
+#ifdef USE_IPV6
+                                   unsigned int remote_scope,
+                                   unsigned int local_scope_id,
+#endif
+                                   const char *interf,
+                                   char *buf, size_t buf_size);
+UNITTEST if2ip_result_t if2ip_scan(struct ifaddrs *head, int af,
+#ifdef USE_IPV6
+                                   unsigned int remote_scope,
+                                   unsigned int local_scope_id,
+#endif
+                                   const char *interf,
+                                   char *buf, size_t buf_size)
+{
+  struct ifaddrs *iface;
+  if2ip_result_t res = IF2IP_NOT_FOUND;
+
+#if defined(USE_IPV6) && !defined(HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID)
+  (void)local_scope_id;
+#endif
+
+  for(iface = head; iface; iface = iface->ifa_next) {
+    if(iface->ifa_addr) {
+      if(iface->ifa_addr->sa_family == af) {
+        if(!strcmp(iface->ifa_name, interf)) {
+          void *addr;
+          char scope[12] = "";
+          char ipstr[64];
+          CURLcode result;
+#ifdef USE_IPV6
+          if(af == AF_INET6) {
+#ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
+            unsigned int scopeid = 0;
+#endif
+            unsigned int ifscope = Curl_ipv6_scope(iface->ifa_addr);
+
+            if(ifscope != remote_scope) {
+              /* We are interested only in interface addresses whose scope
+                 matches the remote address we want to connect to: global
+                 for global, link-local for link-local, etc... */
+              if(res == IF2IP_NOT_FOUND)
+                res = IF2IP_AF_NOT_SUPPORTED;
+              continue;
+            }
+
+            addr =
+              &((struct sockaddr_in6 *)(void *)iface->ifa_addr)->sin6_addr;
+#ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
+            /* Include the scope of this interface as part of the address */
+            scopeid = ((struct sockaddr_in6 *)(void *)iface->ifa_addr)
+                        ->sin6_scope_id;
+
+            /* If given, scope id should match. */
+            if(local_scope_id && scopeid != local_scope_id) {
+              if(res == IF2IP_NOT_FOUND)
+                res = IF2IP_AF_NOT_SUPPORTED;
+
+              continue;
+            }
+
+            if(scopeid)
+              curl_msnprintf(scope, sizeof(scope), "%%%u", scopeid);
+#endif
+          }
+          else
+#endif
+            addr =
+              &((struct sockaddr_in *)(void *)iface->ifa_addr)->sin_addr;
+          res = IF2IP_FOUND;
+          result = curlx_inet_ntop(af, addr, ipstr, sizeof(ipstr));
+          curl_msnprintf(buf, buf_size, "%s%s", result ? "" : ipstr, scope);
+          break;
+        }
+      }
+      else if((res == IF2IP_NOT_FOUND) &&
+              !strcmp(iface->ifa_name, interf)) {
+        res = IF2IP_AF_NOT_SUPPORTED;
+      }
+    }
+  }
+
+  return res;
+}
+
 if2ip_result_t Curl_if2ip(int af,
 #ifdef USE_IPV6
                           unsigned int remote_scope,
@@ -99,74 +185,15 @@ if2ip_result_t Curl_if2ip(int af,
                           const char *interf,
                           char *buf, size_t buf_size)
 {
-  struct ifaddrs *iface, *head;
+  struct ifaddrs *head;
   if2ip_result_t res = IF2IP_NOT_FOUND;
 
-#if defined(USE_IPV6) && !defined(HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID)
-  (void)local_scope_id;
-#endif
-
   if(getifaddrs(&head) >= 0) {
-    for(iface = head; iface; iface = iface->ifa_next) {
-      if(iface->ifa_addr) {
-        if(iface->ifa_addr->sa_family == af) {
-          if(curl_strequal(iface->ifa_name, interf)) {
-            void *addr;
-            char scope[12] = "";
-            char ipstr[64];
-            CURLcode result;
+    res = if2ip_scan(head, af,
 #ifdef USE_IPV6
-            if(af == AF_INET6) {
-#ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
-              unsigned int scopeid = 0;
+                     remote_scope, local_scope_id,
 #endif
-              unsigned int ifscope = Curl_ipv6_scope(iface->ifa_addr);
-
-              if(ifscope != remote_scope) {
-                /* We are interested only in interface addresses whose scope
-                   matches the remote address we want to connect to: global
-                   for global, link-local for link-local, etc... */
-                if(res == IF2IP_NOT_FOUND)
-                  res = IF2IP_AF_NOT_SUPPORTED;
-                continue;
-              }
-
-              addr =
-                &((struct sockaddr_in6 *)(void *)iface->ifa_addr)->sin6_addr;
-#ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
-              /* Include the scope of this interface as part of the address */
-              scopeid = ((struct sockaddr_in6 *)(void *)iface->ifa_addr)
-                          ->sin6_scope_id;
-
-              /* If given, scope id should match. */
-              if(local_scope_id && scopeid != local_scope_id) {
-                if(res == IF2IP_NOT_FOUND)
-                  res = IF2IP_AF_NOT_SUPPORTED;
-
-                continue;
-              }
-
-              if(scopeid)
-                curl_msnprintf(scope, sizeof(scope), "%%%u", scopeid);
-#endif
-            }
-            else
-#endif
-              addr =
-                &((struct sockaddr_in *)(void *)iface->ifa_addr)->sin_addr;
-            res = IF2IP_FOUND;
-            result = curlx_inet_ntop(af, addr, ipstr, sizeof(ipstr));
-            curl_msnprintf(buf, buf_size, "%s%s", result ? "" : ipstr, scope);
-            break;
-          }
-        }
-        else if((res == IF2IP_NOT_FOUND) &&
-                curl_strequal(iface->ifa_name, interf)) {
-          res = IF2IP_AF_NOT_SUPPORTED;
-        }
-      }
-    }
-
+                     interf, buf, buf_size);
     freeifaddrs(head);
   }
 

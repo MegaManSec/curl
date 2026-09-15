@@ -25,6 +25,10 @@
  ***************************************************************************/
 #include "curl_setup.h"
 
+#ifdef HAVE_GETIFADDRS
+struct ifaddrs;
+#endif
+
 /* IPv6 address scopes. */
 #define IPV6_SCOPE_GLOBAL       0       /* Global scope. */
 #define IPV6_SCOPE_LINKLOCAL    1       /* Link-local scope. */
