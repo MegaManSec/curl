@@ -29,8 +29,16 @@
 
 #define MAX_JSON_STRING 100000
 
+/* appended within the quotes when a value is cut off at MAX_JSON_STRING, so
+   the output stays valid JSON instead of silently omitting the value */
+#define JSON_TRUNC_SUFFIX "..."
+#define JSON_TRUNC_SUFFIX_LEN (sizeof(JSON_TRUNC_SUFFIX) - 1)
+
 /* provide the given string in dynbuf as a quoted json string, but without the
    outer quotes. The buffer is not inited by this function.
+
+   If the escaped output would exceed MAX_JSON_STRING, it is cut off and
+   JSON_TRUNC_SUFFIX is appended so the result remains valid JSON.
 
    Return 0 on success, non-zero on error. */
 int jsonquoted(const char *in, size_t len, struct dynbuf *out, bool lowercase)
@@ -38,8 +46,29 @@ int jsonquoted(const char *in, size_t len, struct dynbuf *out, bool lowercase)
   const unsigned char *i = (const unsigned char *)in;
   const unsigned char *in_end = &i[len];
   CURLcode result = CURLE_OK;
+  size_t avail = MAX_JSON_STRING - 1 - JSON_TRUNC_SUFFIX_LEN;
+  bool trunc = FALSE;
 
   for(; (i < in_end) && !result; i++) {
+    size_t needed;
+    switch(*i) {
+    case '\\':
+    case '\"':
+    case '\b':
+    case '\f':
+    case '\n':
+    case '\r':
+    case '\t':
+      needed = 2;
+      break;
+    default:
+      needed = (*i < 32) ? 6 : 1;
+      break;
+    }
+    if(curlx_dyn_len(out) + needed > avail) {
+      trunc = TRUE;
+      break;
+    }
     switch(*i) {
     case '\\':
       result = curlx_dyn_addn(out, "\\\\", 2);
@@ -75,6 +104,8 @@ int jsonquoted(const char *in, size_t len, struct dynbuf *out, bool lowercase)
       break;
     }
   }
+  if(!result && trunc)
+    result = curlx_dyn_addn(out, JSON_TRUNC_SUFFIX, JSON_TRUNC_SUFFIX_LEN);
   if(result)
     return (int)result;
   return 0;

@@ -109,6 +109,10 @@ The header names provided in lowercase, listed in order of appearance over the
 wire. Except for duplicated headers. They are grouped on the first occurrence
 of that header, each value is presented in the JSON array.
 
+A header name or value that exceeds 100000 bytes once JSON-escaped is cut off
+at that length with a trailing `...` added inside the string, so the output
+remains valid JSON.
+
 ## `http_code`
 The numerical response code that was found in the last retrieved HTTP(S) or
 FTP(s) transfer.
