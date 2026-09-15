@@ -461,6 +461,7 @@ CURLcode Curl_peer_from_connect_to(struct Curl_easy *data,
 {
   struct peer_parse pp;
   const char *portstr = NULL;
+  bool port_only = FALSE;
   CURLcode result;
 
   Curl_peer_unlink(ppeer);
@@ -493,11 +494,19 @@ CURLcode Curl_peer_from_connect_to(struct Curl_easy *data,
   if(!pp.host_user.len) { /* no hostname found, only port switch */
     pp.host_user.str = dest->user_hostname;
     pp.host_user.len = strlen(dest->user_hostname);
+    port_only = TRUE;
   }
 
   result = peer_parse_host(data, &pp, FALSE);
   if(result)
     goto out;
+
+  if(port_only && dest->zoneid) {
+    /* restore the zone/scope lost by reparsing dest->user_hostname */
+    pp.zoneid.str = dest->zoneid;
+    pp.zoneid.len = strlen(dest->zoneid);
+    pp.scopeid = dest->scopeid;
+  }
 
   if(portstr && portstr[1]) {
     const char *p = portstr + 1;
