@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+CURLMOPT_NOTIFYFUNCTION
+CURLMNOTIFY_EASY_DONE
+multi
+</keywords>
+</info>
+
+<reply>
+</reply>
+
+<client>
+<features>
+file
+</features>
+<tool>
+lib%TESTNUMBER
+</tool>
+
+<name>
+CURLMOPT_NOTIFYFUNCTION self-unregister during dispatch does not crash
+</name>
+<command>
+file://%FILE_PWD/%LOGDIR/data%TESTNUMBER
+</command>
+<file name="%LOGDIR/data%TESTNUMBER">
+hello
+</file>
+</client>
+
+# Verify that a notify callback that unregisters itself on its first
+# invocation runs to completion without crashing and receives no further
+# notifications from the batch it unregistered in.
+<verify>
+<errorcode>
+0
+</errorcode>
+<stdout>
+notify count: 1
+</stdout>
+</verify>
+
+</testcase>

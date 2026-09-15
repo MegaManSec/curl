@@ -49,7 +49,10 @@ can use more libcurl API functions. Apart from curl_multi_perform(3),
 curl_multi_socket(3), curl_multi_socket_action(3), curl_multi_socket_all(3)
 and curl_multi_cleanup(3) it may call all other methods on the
 multi and easy handles. This includes adding and removing easy
-handles to/from the multi handle.
+handles to/from the multi handle, and calling curl_multi_setopt(3) to
+change or clear this very option. If the callback is cleared this way, no
+further notifications from the batch currently being dispatched are
+delivered.
 
 This callback may get invoked at any time when interacting with libcurl.
 This may even happen after all transfers are done and *may also*
