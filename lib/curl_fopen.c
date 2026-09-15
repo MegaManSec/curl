@@ -89,19 +89,26 @@ CURLcode Curl_fopen(struct Curl_easy *data, const char *filename,
   char *tempstore = NULL;
 #ifndef _WIN32
   curlx_struct_stat sb;
+#ifdef HAVE_FCHMOD
+  bool clone_mode = FALSE;
+#endif
 #endif
   int fd = -1;
   char *dir = NULL;
   *tempname = NULL;
 
 #ifndef _WIN32
-  *fh = curlx_fopen(filename, FOPEN_WRITETEXT);
-  if(!*fh)
-    goto fail;
-  if(curlx_fstat(fileno(*fh), &sb) == -1 || !S_ISREG(sb.st_mode)) {
-    return CURLE_OK;
+  if(curlx_stat(filename, &sb) != -1) {
+    if(!S_ISREG(sb.st_mode)) {
+      *fh = curlx_fopen(filename, FOPEN_WRITETEXT);
+      if(!*fh)
+        goto fail;
+      return CURLE_OK;
+    }
+#ifdef HAVE_FCHMOD
+    clone_mode = TRUE;
+#endif
   }
-  curlx_fclose(*fh);
 #endif /* !_WIN32 */
   *fh = NULL;
 
@@ -140,7 +147,7 @@ CURLcode Curl_fopen(struct Curl_easy *data, const char *filename,
 #ifdef HAVE_FCHMOD
   {
     curlx_struct_stat nsb;
-    if((curlx_fstat(fd, &nsb) != -1) &&
+    if(clone_mode && (curlx_fstat(fd, &nsb) != -1) &&
        (nsb.st_uid == sb.st_uid) && (nsb.st_gid == sb.st_gid)) {
       /* if the user and group are the same, clone the original mode */
       if(fchmod(fd, sb.st_mode) == -1)
