@@ -46,9 +46,10 @@ option.
 As with most libcurl options, the user of this option must make sure that the
 *correct* data (address) is passed on. libcurl does little to no verification.
 
-Note that if you want to send a *different* HAProxy client IP in a subsequent
-request, you need to make sure that it is done over a fresh connection as
-libcurl does not send it again while reusing connections.
+A connection is only reused for a subsequent request if that request uses
+the same client IP (or lack thereof); otherwise libcurl transparently opens
+a new connection instead of resending this header on a connection
+established with a different client IP.
 
 # DEFAULT
 
