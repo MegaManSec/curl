@@ -131,6 +131,9 @@ you also set the CURLU_URLENCODE flag.
 
 Unless *CURLU_NO_AUTHORITY* is set, a blank hostname is not allowed to set.
 
+If setting the host fails, the zone id from a previously set bracketed IPv6
+address is left untouched, along with the rest of the URL.
+
 ## CURLUPART_ZONEID
 
 If the hostname is a numeric IPv6 address, this field can also be set.
