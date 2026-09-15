@@ -1296,8 +1296,23 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
   /* Keep on listening and act on events */
   while(keepon) {
     const DWORD buf_size = (DWORD)sizeof(buffer);
-    DWORD waitret = WaitForMultipleObjects(obj_count, objs,
-                                           FALSE, wait_timeout);
+    DWORD loop_wait_timeout = wait_timeout;
+    DWORD waitret;
+
+    if(Curl_rlimit_active(&data->progress.dl.rlimit)) {
+      timediff_t wait_ms = Curl_rlimit_wait_ms(&data->progress.dl.rlimit,
+                                               Curl_pgrs_now(data));
+      if(wait_ms > 0) {
+        WSAEventSelect(sockfd, event_handle, FD_CLOSE);
+        if((DWORD)wait_ms < loop_wait_timeout)
+          loop_wait_timeout = (DWORD)wait_ms;
+      }
+      else
+        WSAEventSelect(sockfd, event_handle, FD_READ | FD_CLOSE);
+    }
+
+    waitret = WaitForMultipleObjects(obj_count, objs,
+                                     FALSE, loop_wait_timeout);
     switch(waitret) {
 
     case WAIT_TIMEOUT: {
@@ -1378,7 +1393,15 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
       if(events.lNetworkEvents & FD_READ) {
         /* read data from network */
         size_t nread;
-        result = Curl_xfer_recv(data, buffer, sizeof(buffer), &nread);
+        size_t buflen = sizeof(buffer);
+
+        if(Curl_rlimit_active(&data->progress.dl.rlimit)) {
+          curl_off_t dl_avail =
+            Curl_rlimit_avail(&data->progress.dl.rlimit, NULL);
+          if(dl_avail > 0 && dl_avail < (curl_off_t)buflen)
+            buflen = (size_t)dl_avail;
+        }
+        result = Curl_xfer_recv(data, buffer, buflen, &nread);
         /* read would have blocked. Loop again */
         if(result == CURLE_AGAIN)
           break;
@@ -1394,6 +1417,7 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
           break;
         }
 
+        Curl_pgrs_download_inc(data, nread);
         result = telrcv(data, tn, (unsigned char *)buffer, nread);
         if(result) {
           keepon = FALSE;
@@ -1419,6 +1443,12 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
       failf(data, "Time-out");
       result = CURLE_OPERATION_TIMEDOUT;
       keepon = FALSE;
+    }
+
+    if(!result) {
+      result = Curl_pgrsCheck(data);
+      if(result)
+        keepon = FALSE;
     }
   }
 
