@@ -188,6 +188,11 @@ static CURLcode schannel_set_ssl_version_min_max(DWORD *enabled_protocols,
     break;
   }
 
+  if(ssl_version > (ssl_version_max >> 16)) {
+    failf(data, "schannel: TLS 1.3 not supported on Windows 10 or older");
+    return CURLE_SSL_CONNECT_ERROR;
+  }
+
   for(; i <= (ssl_version_max >> 16); ++i) {
     switch(i) {
     case CURL_SSLVERSION_TLSv1_0:
