@@ -1,5 +1,5 @@
-#ifndef HEADER_CURL_WS_H
-#define HEADER_CURL_WS_H
+#ifndef HEADER_CURL_SHA1_H
+#define HEADER_CURL_SHA1_H
 /***************************************************************************
  *                                  _   _ ____  _
  *  Project                     ___| | | |  _ \| |
@@ -25,22 +25,13 @@
  ***************************************************************************/
 #include "curl_setup.h"
 
-#if !defined(CURL_DISABLE_WEBSOCKETS) && !defined(CURL_DISABLE_HTTP)
+#ifndef CURL_DISABLE_WEBSOCKETS
 
-extern const struct Curl_protocol Curl_protocol_ws;
+#define CURL_SHA1_DIGEST_LENGTH 20 /* fixed size */
 
-/* meta key for storing protocol meta at connection */
-#define CURL_META_PROTO_WS_CONN   "meta:proto:ws:conn"
+CURLcode Curl_sha1it(unsigned char *output, const unsigned char *input,
+                     size_t len);
 
-CURLcode Curl_ws_request(struct Curl_easy *data, struct dynbuf *req);
-CURLcode Curl_ws_accept(struct Curl_easy *data,
-                        const char *mem, size_t nread);
-CURLcode Curl_ws_hdr(struct Curl_easy *data, const char *hd, size_t hdlen);
-
-#else
-#define Curl_ws_request(x, y) CURLE_OK
-#define Curl_ws_hdr(x, y, z)  CURLE_OK
-#define Curl_ws_free(x)       Curl_nop_stmt
 #endif
 
-#endif /* HEADER_CURL_WS_H */
+#endif /* HEADER_CURL_SHA1_H */

@@ -129,6 +129,10 @@ struct SingleRequest {
 #ifndef CURL_DISABLE_COOKIES
   unsigned char setcookies;
 #endif
+#ifndef CURL_DISABLE_WEBSOCKETS
+  char ws_key[40];    /* the Sec-WebSocket-Key sent, kept for verifying the
+                          Sec-WebSocket-Accept response against */
+#endif
   BIT(header);        /* incoming data has HTTP header */
   BIT(done);          /* request is done, e.g. no more send/recv should
                        * happen. This can be TRUE before `upload_done` or
@@ -159,6 +163,9 @@ struct SingleRequest {
   BIT(shutdown);     /* request end will shutdown connection */
   BIT(shutdown_err_ignore); /* errors in shutdown will not fail request */
   BIT(reader_started); /* client reads have started */
+#ifndef CURL_DISABLE_WEBSOCKETS
+  BIT(ws_accept_seen); /* a verified Sec-WebSocket-Accept was received */
+#endif
 };
 
 /**
