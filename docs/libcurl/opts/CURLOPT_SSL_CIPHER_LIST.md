@@ -43,6 +43,9 @@ separated by colons.
 
 For setting TLS 1.3 ciphers see CURLOPT_TLS13_CIPHERS(3).
 
+With mbedTLS and Rustls, a cipher suite name that is a TLS 1.3 suite is
+rejected instead of being enabled for TLS 1.2 and below.
+
 A valid example of a cipher list with OpenSSL is:
 ~~~
 "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:"

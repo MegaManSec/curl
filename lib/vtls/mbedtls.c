@@ -337,6 +337,16 @@ add_ciphers:
       continue;
     }
 
+#ifdef MBEDTLS_SSL_PROTO_TLS1_3
+    /* Check if cipher matches the TLS version of this option */
+    if((ciphers == ciphers13) !=
+       !strncmp(mbedtls_ssl_get_ciphersuite_name(id), "TLS1-3", 6)) {
+      infof(data, "mbedTLS: cipher not valid for this TLS version: "
+            "\"%.*s\"", (int)(end - ptr), ptr);
+      continue;
+    }
+#endif
+
     /* No duplicates allowed (so selected cannot overflow) */
     for(i = 0; i < count && selected[i] != id; i++)
       ;

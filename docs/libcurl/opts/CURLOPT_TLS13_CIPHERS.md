@@ -42,6 +42,9 @@ separated by colons.
 
 For setting TLS 1.2 (1.1, 1.0) ciphers see CURLOPT_SSL_CIPHER_LIST(3).
 
+With mbedTLS and Rustls, a cipher suite name that is not a TLS 1.3 suite is
+rejected instead of being enabled for TLS 1.3.
+
 A valid example of a cipher list is:
 ~~~c
 "TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256"

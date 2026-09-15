@@ -472,6 +472,15 @@ add_ciphers:
       continue;
     }
 
+    /* Check if cipher matches the TLS version of this option */
+    if((ciphers == ciphers13) !=
+       (rustls_supported_ciphersuite_protocol_version(entry) ==
+        RUSTLS_TLS_VERSION_TLSV1_3)) {
+      infof(data, "rustls: cipher not valid for this TLS version: "
+            "\"%.*s\"", (int)(end - ptr), ptr);
+      continue;
+    }
+
     /* No duplicates allowed (so selected cannot overflow) */
     for(i = 0; i < count && selected[i] != entry; i++)
       ;
