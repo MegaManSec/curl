@@ -64,6 +64,14 @@ HSTS and Alt-Svc information to be stored and used subsequently. Disabling
 certificate verification can make libcurl trust and use such information from
 malicious servers.
 
+Changing this option on an easy handle that is currently attached to a
+connection only affects that connection's handshake if it has not
+completed yet. It never retroactively relabels an already established
+connection: libcurl does not reuse a connection that was verified with a
+weaker policy to satisfy a later, stricter request, and it does not skip
+verification on a connection that was itself established with strict
+verification.
+
 # MATCHING
 
 A certificate can have the name as a wildcard. The only asterisk (`*`) must
