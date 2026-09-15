@@ -52,6 +52,7 @@ CURLcode Curl_req_soft_reset(struct SingleRequest *req,
   req->eos_read = FALSE;
   req->eos_sent = FALSE;
   req->ignorebody = FALSE;
+  req->ignore_cl = FALSE;
   req->shutdown = FALSE;
   req->bytecount = 0;
   req->writebytecount = 0;
