@@ -70,6 +70,7 @@ struct per_transfer {
   BIT(infdopen); /* TRUE if infd needs closing */
   BIT(noprogress);
   BIT(was_last_header_empty);
+  BIT(readbusy); /* set when reading input returns EAGAIN */
 
   BIT(added); /* set TRUE when added to the multi handle */
   BIT(abort); /* when doing parallel transfers and this is TRUE then a critical
