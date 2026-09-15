@@ -34,6 +34,9 @@ instead of the path as extracted from the URL.
 libcurl passes on the verbatim string in its request without any filter or
 other safe guards. That includes white space and control characters.
 
+When HTTP Digest authentication is used, this string is also what gets
+signed as the `uri` directive, matching the actual request-target sent.
+
 Using this option multiple times makes the last set string override the
 previous ones. Set it to NULL to disable its use again.
 
