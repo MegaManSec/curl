@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HAProxy
+CRLF
+</keywords>
+</info>
+
+# Client-side
+<client>
+<tool>
+lib%TESTNUMBER
+</tool>
+<name>
+CURLOPT_HAPROXY_CLIENT_IP rejects non-address strings
+</name>
+
+<command>
+-
+</command>
+</client>
+
+<verify>
+<stdout mode="text">
+ok
+</stdout>
+</verify>
+</testcase>

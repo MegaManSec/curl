@@ -43,8 +43,9 @@ previous ones. Set it to NULL to disable its use again.
 The application does not have to keep the string around after setting this
 option.
 
-As with most libcurl options, the user of this option must make sure that the
-*correct* data (address) is passed on. libcurl does little to no verification.
+libcurl rejects strings that are not a syntactically valid IPv4 or IPv6
+numerical address, so the resulting PROXY protocol header line cannot be
+manipulated by passing in extra characters such as CR or LF.
 
 Note that if you want to send a *different* HAProxy client IP in a subsequent
 request, you need to make sure that it is done over a fresh connection as
@@ -79,3 +80,6 @@ curl_easy_setopt(3) returns a CURLcode indicating success or error.
 
 CURLE_OK (0) means everything was OK, non-zero means an error occurred, see
 libcurl-errors(3).
+
+Returns CURLE_BAD_FUNCTION_ARGUMENT if the string is not a valid IPv4 or
+IPv6 address.
