@@ -123,6 +123,10 @@ void Curl_ssl_config_cleanup(struct ssl_filter_config *sslc)
     curlx_safefree(sslc->issuercert_blob);
     curlx_safefree(sslc->key_blob);
     curlx_safefree(sslc->curves);
+#ifdef USE_ECH
+    curlx_safefree(sslc->ech_config);
+    curlx_safefree(sslc->ech_public);
+#endif
     curlx_safefree(sslc->signature_algorithms);
     curlx_safefree(sslc->CRLfile);
     curlx_safefree(sslc->cert_type);
@@ -142,6 +146,11 @@ static bool match_ssl_primary_config(struct Curl_easy *data,
      (c1->version_max == c2->version_max) &&
      (c1->ssl_options == c2->ssl_options) &&
      (c1->native_ca_store == c2->native_ca_store) &&
+#ifdef USE_ECH
+     (c1->tls_ech == c2->tls_ech) &&
+     Curl_safecmp(c1->ech_config, c2->ech_config) &&
+     Curl_safecmp(c1->ech_public, c2->ech_public) &&
+#endif
      (c1->verifypeer == c2->verifypeer) &&
      (c1->verifyhost == c2->verifyhost) &&
      (c1->verifystatus == c2->verifystatus) &&
@@ -204,6 +213,9 @@ static bool clone_ssl_primary_config(struct ssl_filter_config *source,
   dest->no_partialchain = source->no_partialchain;
   dest->no_revoke = source->no_revoke;
   dest->revoke_best_effort = source->revoke_best_effort;
+#ifdef USE_ECH
+  dest->tls_ech = source->tls_ech;
+#endif
 
   CLONE_BLOB(cert_blob);
   CLONE_BLOB(ca_info_blob);
@@ -215,6 +227,10 @@ static bool clone_ssl_primary_config(struct ssl_filter_config *source,
   CLONE_STRING(cipher_list13);
   CLONE_STRING(pinned_key);
   CLONE_STRING(curves);
+#ifdef USE_ECH
+  CLONE_STRING(ech_config);
+  CLONE_STRING(ech_public);
+#endif
   CLONE_STRING(signature_algorithms);
   CLONE_STRING(CRLfile);
   /* SSL credentials: client certificate */
@@ -305,6 +321,11 @@ CURLcode Curl_ssl_filter_config_tmp_init(
     ssl_easy_steal(data, STRING_SSL_SIGNATURE_ALGORITHMS);
   ssl_origin->ca_info_blob = data->set.blobs[BLOB_CAINFO];
   ssl_origin->curves = ssl_easy_steal(data, STRING_SSL_EC_CURVES);
+#ifdef USE_ECH
+  ssl_origin->tls_ech = data->set.tls_ech;
+  ssl_origin->ech_config = ssl_easy_steal(data, STRING_ECH_CONFIG);
+  ssl_origin->ech_public = ssl_easy_steal(data, STRING_ECH_PUBLIC);
+#endif
   /* Maybe these should not be used for another origin. But for
    * backwards compatibility, keep them in. */
   ssl_origin->issuercert = ssl_easy_steal(data, STRING_SSL_ISSUERCERT);
