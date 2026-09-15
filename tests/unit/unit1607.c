@@ -243,6 +243,71 @@ static CURLcode test_unit1607(const char *arg)
       continue;
     }
   }
+
+  /* A stale exact CURLOPT_RESOLVE entry must not suppress a wildcard
+     "*:port" fallback entry: once the exact entry is evicted for being
+     stale, the lookup should retry the wildcard before reporting a
+     miss. */
+  {
+    struct Curl_peer *peer = NULL;
+    struct Curl_dns_entry *dns = NULL;
+    struct t1607_key entry_id;
+    CURLcode result;
+
+    easy = curl_easy_init();
+    if(!easy)
+      goto error;
+    multi = curl_multi_init();
+    curl_multi_add_handle(multi, easy);
+    curl_easy_setopt(easy, CURLOPT_DNS_CACHE_TIMEOUT, 1L);
+
+    list = curl_slist_append(NULL, "+stale.example:80:127.0.0.3");
+    list = curl_slist_append(list, "*:80:127.0.0.9");
+    if(!list)
+      goto error;
+    curl_easy_setopt(easy, CURLOPT_RESOLVE, list);
+    Curl_loadhostpairs(easy);
+
+    /* age the exact entry past the cache timeout, without waiting */
+    t1607_create_key(&entry_id, "stale.example", 80, CURL_DNST_ADDR);
+    dns = Curl_hash_pick(&multi->dnscache.entries,
+                         entry_id.data, entry_id.len);
+    if(dns)
+      dns->added.tv_sec -= 3600;
+
+    if(Curl_peer_create(easy, &Curl_scheme_http, "stale.example", 80,
+                        &peer)) {
+      curl_mfprintf(stderr, "%s:%d stale/wildcard test failed. "
+                    "Curl_peer_create failed.\n", __FILE__, __LINE__);
+      unitfail++;
+    }
+    else {
+      dns = NULL;
+      result = Curl_dnscache_get(easy, CURL_DNSQ_ADDR, peer, &dns);
+      if(result || !dns) {
+        curl_mfprintf(stderr, "%s:%d stale/wildcard test failed. expected "
+                      "the wildcard entry as a fallback, got a miss "
+                      "(result %d).\n", __FILE__, __LINE__, (int)result);
+        unitfail++;
+      }
+      else {
+        char ipaddress[MAX_IPADR_LEN] = { 0 };
+        uint16_t port = 0;
+        if(sockaddr2string(dns->addr->ai_addr, dns->addr->ai_addrlen,
+                           ipaddress, &port) ||
+           !curl_strequal(ipaddress, "127.0.0.9")) {
+          curl_mfprintf(stderr, "%s:%d stale/wildcard test failed. expected "
+                        "fallback address 127.0.0.9, got %s.\n",
+                        __FILE__, __LINE__, ipaddress);
+          unitfail++;
+        }
+      }
+      if(dns)
+        Curl_dns_entry_unlink(easy, &dns);
+    }
+    Curl_peer_unlink(&peer);
+  }
+
 error:
   curl_easy_cleanup(easy);
   curl_multi_cleanup(multi);

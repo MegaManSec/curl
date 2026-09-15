@@ -49,7 +49,9 @@ entries can of course be either IPv4 or IPv6 style addressing.
 
 Specify the host as a single asterisk (`*`) to match all names. This wildcard
 is resolved last so any resolve with a specific host and port number is given
-priority.
+priority. This also applies once a non-permanent (`+`-prefixed) specific
+entry has expired: the wildcard entry is used instead of triggering a live
+DNS lookup.
 
 This option effectively populates the DNS cache with entries for the host+port
 pair so redirects and everything that operations against the HOST+PORT instead
