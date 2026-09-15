@@ -16,4 +16,9 @@ unittest
 dynhds unit tests
 </name>
 </client>
+<verify>
+<limits>
+Allocations: 6000
+</limits>
+</verify>
 </testcase>

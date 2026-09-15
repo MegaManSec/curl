@@ -270,7 +270,8 @@ static struct h2_stream_ctx *h2_stream_ctx_create(struct cf_h2_ctx *ctx)
   Curl_bufq_initp(&stream->sendbuf, &ctx->stream_bufcp,
                   H2_STREAM_SEND_CHUNKS, BUFQ_OPT_NONE);
   Curl_h1_req_parse_init(&stream->h1, H1_PARSE_DEFAULT_MAX_LINE_LEN);
-  Curl_dynhds_init(&stream->resp_trailers, 0, DYN_HTTP_REQUEST);
+  Curl_dynhds_init(&stream->resp_trailers, MAX_HTTP_RESP_HEADER_COUNT,
+                   DYN_HTTP_REQUEST);
   stream->bodystarted = FALSE;
   stream->status_code = -1;
   stream->closed = FALSE;

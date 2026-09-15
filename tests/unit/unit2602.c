@@ -25,6 +25,7 @@
 #include "urldata.h"
 #include "dynhds.h"
 #include "curl_trc.h"
+#include "http.h"
 
 static CURLcode test_unit2602(const char *arg)
 {
@@ -63,6 +64,26 @@ static CURLcode test_unit2602(const char *arg)
   /* exceed limit on # of entries */
   result = Curl_dynhds_add(&hds, "test3", 5, "789", 3);
   fail_unless(result, "add should have failed");
+
+  Curl_dynhds_free(&hds);
+
+  /* many tiny entries must not bypass an entry-count limit via a
+     small cumulative byte total, as relied on to bound HTTP/2 trailers */
+  Curl_dynhds_init(&hds, MAX_HTTP_RESP_HEADER_COUNT, DYN_HTTP_REQUEST);
+  for(i = 0; i < MAX_HTTP_RESP_HEADER_COUNT; ++i) {
+    if(Curl_dynhds_add(&hds, "t", 1, "v", 1)) {
+      fail_if(TRUE, "add failed");
+      break;
+    }
+  }
+  fail_unless(Curl_dynhds_add(&hds, "t", 1, "v", 1), "add should have failed");
+  fail_unless(Curl_dynhds_count(&hds) == MAX_HTTP_RESP_HEADER_COUNT,
+              "should hold max count");
+  Curl_dynhds_free(&hds);
+
+  Curl_dynhds_init(&hds, 2, 128);
+  fail_if(Curl_dynhds_add(&hds, "test1", 5, "123", 3), "add failed");
+  fail_if(Curl_dynhds_add(&hds, "test2", 5, "456", 3), "add failed");
 
   fail_unless(dynhds_count_name(&hds, "test", 4) == 0, "false positive");
   fail_unless(dynhds_count_name(&hds, "test1", 4) == 0, "false positive");
