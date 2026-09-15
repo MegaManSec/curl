@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+CURLMOPT_NOTIFYFUNCTION
+CURLMNOTIFY_EASY_DONE
+multi
+</keywords>
+</info>
+
+<reply>
+</reply>
+
+<client>
+<features>
+file
+</features>
+<tool>
+lib%TESTNUMBER
+</tool>
+
+<name>
+CURLMOPT_NOTIFYFUNCTION delivers EASY_DONE across multiple chunks
+</name>
+<command>
+file://%FILE_PWD/%LOGDIR/data%TESTNUMBER
+</command>
+<file name="%LOGDIR/data%TESTNUMBER">
+hello
+</file>
+</client>
+
+# Verify that the test runs to completion without crashing
+<verify>
+<errorcode>
+0
+</errorcode>
+<stdout>
+notify count: 300
+</stdout>
+<limits>
+Allocations: 10000
+Maximum allocated: 2000000
+</limits>
+</verify>
+
+</testcase>
