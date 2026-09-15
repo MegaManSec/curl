@@ -448,6 +448,7 @@ CURLcode Curl_pretransfer(struct Curl_easy *data)
    * "Connection died, tried CONN_MAX_RETRIES times before giving up".
    * By resetting it here, we ensure each new request starts fresh. */
   data->state.retrycount = 0;
+  data->state.refused_stream = FALSE;
 
   if(!CURL_EASY_STR(data, STRING_SET_URL) && !data->set.uh) {
     /* we cannot do anything without URL */
@@ -596,7 +597,10 @@ CURLcode Curl_retry_request(struct Curl_easy *data, char **url)
 {
   struct connectdata *conn = data->conn;
   bool retry = FALSE;
+  bool refused_stream = data->state.refused_stream;
   *url = NULL;
+
+  data->state.refused_stream = FALSE; /* consumed by this call */
 
   /* if we are talking upload, we cannot do the checks below, unless the
      protocol is HTTP as when uploading over HTTP we will still get a
@@ -621,7 +625,7 @@ CURLcode Curl_retry_request(struct Curl_easy *data, char **url)
        done using it before, but that was closed when we wanted to read from
        it again. Bad luck. Retry the same request on a fresh connect! */
     retry = TRUE;
-  else if(data->state.refused_stream &&
+  else if(refused_stream &&
           (data->req.bytecount + data->req.headerbytecount == 0)) {
     /* This was sent on a refused stream, safe to rerun. A refused stream
        error can typically only happen on HTTP/2 level if the stream is safe
@@ -629,7 +633,6 @@ CURLcode Curl_retry_request(struct Curl_easy *data, char **url)
        streams as well, which is why this adds the check the data counters
        too. */
     infof(data, "REFUSED_STREAM, retrying a fresh connect");
-    data->state.refused_stream = FALSE; /* clear again */
     retry = TRUE;
   }
   if(retry) {
