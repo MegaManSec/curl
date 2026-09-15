@@ -205,6 +205,7 @@ CURLcode Curl_auth_decode_ntlm_type2_message(struct Curl_easy *data,
   }
 
   /* Store the challenge for later use */
+  curlx_safefree(ntlm->input_token); /* replace any previous data */
   ntlm->input_token = curlx_memdup0(Curl_bufref_ptr(type2ref),
                                     Curl_bufref_len(type2ref));
   if(!ntlm->input_token)
