@@ -130,6 +130,81 @@ static bool t3211_strcmp(const char *s1, const char *s2)
   return s1 == s2;
 }
 
+/* Watches one pointer's content and, when the hashset frees it, records
+ * whether it was all-zero at that point. The real free is always chained
+ * to, so no memory is ever inspected after it was actually released. */
+static const char *t3211_watch_ptr;
+static size_t t3211_watch_len;
+static int t3211_watch_zeroed;
+static curl_free_callback t3211_real_cfree;
+
+static void t3211_free_watch(void *ptr)
+{
+  if(t3211_watch_ptr) {
+    size_t i;
+    t3211_watch_zeroed = 1;
+    for(i = 0; i < t3211_watch_len; ++i) {
+      if(t3211_watch_ptr[i]) {
+        t3211_watch_zeroed = 0;
+        break;
+      }
+    }
+    t3211_watch_ptr = NULL;
+  }
+  t3211_real_cfree(ptr);
+}
+
+static void t3211_watch_start(const char *ptr)
+{
+  t3211_watch_ptr = ptr;
+  t3211_watch_len = strlen(ptr);
+  t3211_watch_zeroed = -1;
+  t3211_real_cfree = Curl_cfree;
+  Curl_cfree = t3211_free_watch;
+}
+
+static int t3211_watch_stop(void)
+{
+  Curl_cfree = t3211_real_cfree;
+  return t3211_watch_zeroed;
+}
+
+static void t3211_check_strset_zero(void)
+{
+  struct u8_strset set;
+  const char *old;
+  CURLcode result;
+
+  Curl_u8_strset_init(&set);
+  result = u8_strset_set(&set, 1, "topsecret-1");
+  fail_unless(!result, "zero-add1 failed");
+  old = Curl_u8_strset_get(&set, 1);
+  fail_unless(old != NULL, "zero-get1 failed");
+
+  /* replace: Curl_u8_strset_setn() must zero the old value before free */
+  t3211_watch_start(old);
+  result = u8_strset_set(&set, 1, "replacement-1");
+  fail_unless(!result, "zero-replace failed");
+  fail_unless(t3211_watch_stop() == 1, "replaced secret not zeroed");
+
+  /* unset: Curl_u8_strset_unset() must zero the value before free */
+  old = Curl_u8_strset_get(&set, 1);
+  fail_unless(old != NULL, "zero-get2 failed");
+  t3211_watch_start(old);
+  Curl_u8_strset_unset(&set, 1);
+  fail_unless(t3211_watch_stop() == 1, "unset secret not zeroed");
+
+  /* clear: Curl_u8_strset_clear() must zero every value before free.
+   * Use a single entry, so exactly one free() happens. */
+  result = u8_strset_set(&set, 2, "topsecret-2");
+  fail_unless(!result, "zero-add2 failed");
+  old = Curl_u8_strset_get(&set, 2);
+  fail_unless(old != NULL, "zero-get3 failed");
+  t3211_watch_start(old);
+  Curl_u8_strset_clear(&set);
+  fail_unless(t3211_watch_stop() == 1, "cleared secret not zeroed");
+}
+
 static void t3211_check_strset1(void)
 {
   struct u8_strset set;
@@ -244,6 +319,7 @@ static CURLcode test_unit3211(const char *arg)
   t3211_check_bset("s2", 1000, s2, CURL_ARRAYSIZE(s2));
 
   t3211_check_strset1();
+  t3211_check_strset_zero();
 
   UNITTEST_END_SIMPLE
 }
