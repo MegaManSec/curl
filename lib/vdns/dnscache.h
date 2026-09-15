@@ -54,6 +54,7 @@ struct Curl_dns_entry {
   uint8_t dns_queries; /* CURL_DNSQ_* type of queries performed for this */
   uint8_t dns_responses; /* CURL_DNSQ_* type this entry has responses for */
   BIT(permanent); /* entry is permanent, e.g. does not time out */
+  BIT(user_resolve); /* entry came from CURLOPT_RESOLVE, not a live query */
   /* hostname that resolved to addr. may be NULL (Unix domain sockets). */
   char hostname[1];
 };

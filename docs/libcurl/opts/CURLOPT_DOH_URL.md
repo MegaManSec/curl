@@ -49,6 +49,15 @@ previous ones. Set it to NULL to disable its use again.
 
 DoH lookups do not inherit proxy options from its parent transfer.
 
+Resolved names are kept in a DNS cache that, when using the multi interface,
+is shared by default by all the easy handles added to the same multi handle
+(see CURLSHOPT_SHARE(3)). The cache entries are scoped to the DoH URL and the
+CURLOPT_DOH_SSL_VERIFYPEER(3), CURLOPT_DOH_SSL_VERIFYHOST(3) and
+CURLOPT_DOH_SSL_VERIFYSTATUS(3) settings in effect when they were resolved
+(and, for the async resolver backends, to CURLOPT_DNS_SERVERS(3) as well), so
+handles that share a cache but resolve differently only reuse each other's
+results when that resolver configuration matches.
+
 # INHERIT OPTIONS
 
 DoH lookups use SSL and some SSL settings from your transfer are inherited,

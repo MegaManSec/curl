@@ -25,6 +25,10 @@
 #include "urldata.h"
 #include "strcase.h"
 #include "curl_addrinfo.h"
+#include "peer.h"
+#include "protocol.h"
+#include "vdns/dnscache.h"
+#include "vdns/hostip.h"
 
 static CURLcode t1607_setup(void)
 {
@@ -53,6 +57,67 @@ static void t1607_create_key(struct t1607_key *key,
   Curl_strntolower((char *)key->data + 3, hostname, namelen);
   key->len = namelen + 3;
 }
+
+#ifdef USE_ARES
+/*
+ * Two easy handles sharing a DNS cache via the same multi handle, each
+ * configured with a different CURLOPT_DNS_SERVERS, must not see each
+ * other's cached answers; a handle with a matching value still should.
+ */
+static void t1607_dns_servers_rid(void)
+{
+  struct Curl_multi *multi = curl_multi_init();
+  struct Curl_easy *e1 = curl_easy_init();
+  struct Curl_easy *e2 = curl_easy_init();
+  struct Curl_easy *e3 = curl_easy_init();
+  struct Curl_peer *peer = NULL;
+  struct Curl_addrinfo *addr = NULL;
+  struct Curl_dns_entry *dns = NULL;
+
+  if(!multi || !e1 || !e2 || !e3)
+    goto out;
+
+  curl_multi_add_handle(multi, e1);
+  curl_multi_add_handle(multi, e2);
+  curl_multi_add_handle(multi, e3);
+
+  curl_easy_setopt(e1, CURLOPT_DNS_SERVERS, "127.0.0.1:1111");
+  curl_easy_setopt(e2, CURLOPT_DNS_SERVERS, "127.0.0.1:2222");
+  curl_easy_setopt(e3, CURLOPT_DNS_SERVERS, "127.0.0.1:1111");
+
+  if(Curl_peer_create(e1, &Curl_scheme_http, "rid.example", 80, &peer) ||
+     Curl_str2addr("127.0.0.1", 80, &addr))
+    goto out;
+  dns = Curl_dnsc_mk_addr(e1, CURL_DNSQ_A, &addr, peer);
+  fail_unless(dns, "Curl_dnsc_mk_addr failed");
+  if(dns)
+    fail_if(Curl_dnscache_add(e1, dns), "Curl_dnscache_add failed");
+  Curl_dns_entry_unlink(e1, &dns);
+  Curl_peer_unlink(&peer);
+
+  if(Curl_peer_create(e2, &Curl_scheme_http, "rid.example", 80, &peer))
+    goto out;
+  Curl_dnscache_get(e2, CURL_DNSQ_A, peer, &dns);
+  fail_unless(!dns, "a differing CURLOPT_DNS_SERVERS must not cache-hit");
+  Curl_dns_entry_unlink(e2, &dns);
+  Curl_peer_unlink(&peer);
+
+  if(Curl_peer_create(e3, &Curl_scheme_http, "rid.example", 80, &peer))
+    goto out;
+  Curl_dnscache_get(e3, CURL_DNSQ_A, peer, &dns);
+  fail_unless(dns, "a matching CURLOPT_DNS_SERVERS should cache-hit");
+  Curl_dns_entry_unlink(e3, &dns);
+  Curl_peer_unlink(&peer);
+
+out:
+  Curl_peer_unlink(&peer);
+  Curl_freeaddrinfo(addr);
+  curl_easy_cleanup(e1);
+  curl_easy_cleanup(e2);
+  curl_easy_cleanup(e3);
+  curl_multi_cleanup(multi);
+}
+#endif
 
 static CURLcode test_unit1607(const char *arg)
 {
@@ -243,6 +308,11 @@ static CURLcode test_unit1607(const char *arg)
       continue;
     }
   }
+
+#ifdef USE_ARES
+  t1607_dns_servers_rid();
+#endif
+
 error:
   curl_easy_cleanup(easy);
   curl_multi_cleanup(multi);

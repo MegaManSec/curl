@@ -55,6 +55,12 @@ Cached DNS hosts are shared across the easy handles using this shared
 object. Note that when you use the multi interface, all easy handles added to
 the same multi handle share the DNS cache by default without using this option.
 
+Cache entries are additionally scoped to the resolver configuration that
+produced them, namely CURLOPT_DOH_URL(3) and its verification settings, and,
+for the async resolver backends, CURLOPT_DNS_SERVERS(3). Easy handles sharing
+this cache but configured with a different resolver do not hand each other's
+resolved addresses around.
+
 ## CURL_LOCK_DATA_SSL_SESSION
 
 SSL sessions are shared across the easy handles using this shared object. This
