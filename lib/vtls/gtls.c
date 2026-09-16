@@ -1809,6 +1809,13 @@ CURLcode Curl_gtls_verifyserver(struct Curl_cfilter *cf,
       goto out;
     }
     issuerp = load_file(config->issuercert);
+    if(!issuerp.data || !issuerp.size) {
+      failf(data, "failed to load issuer certificate (Issuer Cert: %s)",
+            config->issuercert);
+      unload_file(issuerp);
+      result = CURLE_SSL_ISSUER_ERROR;
+      goto out;
+    }
     rc = gnutls_x509_crt_import(x509_issuer, &issuerp, GNUTLS_X509_FMT_PEM);
     unload_file(issuerp);
     if(rc) {
