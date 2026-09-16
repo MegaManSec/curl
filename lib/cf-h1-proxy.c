@@ -59,6 +59,7 @@ struct h1_tunnel_state {
   struct dynbuf request_data;
   size_t nsent;
   size_t headerlines;
+  size_t foldbytes; /* raw bytes discarded while unfolding rcvbuf */
   struct Curl_chunker ch;
   int httpversion;
   enum keeponval {
@@ -114,6 +115,7 @@ static CURLcode tunnel_reinit(struct Curl_cfilter *cf,
   ts->leading_unfold = FALSE;
   ts->nsent = 0;
   ts->headerlines = 0;
+  ts->foldbytes = 0;
   return CURLE_OK;
 }
 
@@ -431,7 +433,8 @@ static CURLcode single_header(struct Curl_cfilter *cf,
   if(result)
     return result;
 
-  result = Curl_bump_headersize(data, line_len, TRUE);
+  result = Curl_bump_headersize(data, line_len + ts->foldbytes, TRUE);
+  ts->foldbytes = 0;
   if(result)
     return result;
 
@@ -580,9 +583,11 @@ static CURLcode recv_CONNECT_resp(struct Curl_cfilter *cf,
     }
 
     if(ts->leading_unfold) {
-      if(ISBLANK(byte))
+      if(ISBLANK(byte)) {
         /* skip a bit brother */
+        ts->foldbytes++;
         continue;
+      }
       /* non-blank, insert a space then continue the unfolding */
       if(curlx_dyn_addn(&ts->rcvbuf, " ", 1)) {
         failf(data, "CONNECT response too large");
