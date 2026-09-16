@@ -269,8 +269,8 @@ static long wssl_bio_cf_ctrl(WOLFSSL_BIO *bio, int cmd, long num, void *ptr)
 #ifdef WOLFSSL_BIO_CTRL_EOF
   case WOLFSSL_BIO_CTRL_EOF: {
     /* EOF has been reached on input? */
-    struct ssl_connect_data *connssl = cf->ctx;
-    return connssl->peer_closed;
+    struct ssl_connect_data *connssl = cf ? cf->ctx : NULL;
+    return connssl ? connssl->peer_closed : 0;
   }
 #endif
   default:
@@ -283,12 +283,17 @@ static long wssl_bio_cf_ctrl(WOLFSSL_BIO *bio, int cmd, long num, void *ptr)
 static int wssl_bio_cf_out_write(WOLFSSL_BIO *bio, const char *buf, int blen)
 {
   struct Curl_cfilter *cf = wolfSSL_BIO_get_data(bio);
-  struct ssl_connect_data *connssl = cf->ctx;
-  struct wssl_ctx *wssl = (struct wssl_ctx *)connssl->backend;
-  struct Curl_easy *data = CF_DATA_CURRENT(cf);
+  struct ssl_connect_data *connssl;
+  struct wssl_ctx *wssl;
+  struct Curl_easy *data;
   size_t nwritten, skiplen = 0;
   CURLcode result = CURLE_OK;
 
+  if(!cf)
+    return -1;
+  connssl = cf->ctx;
+  wssl = (struct wssl_ctx *)connssl->backend;
+  data = CF_DATA_CURRENT(cf);
   DEBUGASSERT(data);
   if(wssl->shutting_down && wssl->io_send_blocked_len &&
      (wssl->io_send_blocked_len < blen)) {
@@ -321,12 +326,17 @@ static int wssl_bio_cf_out_write(WOLFSSL_BIO *bio, const char *buf, int blen)
 static int wssl_bio_cf_in_read(WOLFSSL_BIO *bio, char *buf, int blen)
 {
   struct Curl_cfilter *cf = wolfSSL_BIO_get_data(bio);
-  struct ssl_connect_data *connssl = cf->ctx;
-  struct wssl_ctx *wssl = (struct wssl_ctx *)connssl->backend;
-  struct Curl_easy *data = CF_DATA_CURRENT(cf);
+  struct ssl_connect_data *connssl;
+  struct wssl_ctx *wssl;
+  struct Curl_easy *data;
   size_t nread = 0;
   CURLcode result = CURLE_OK;
 
+  if(!cf)
+    return -1;
+  connssl = cf->ctx;
+  wssl = (struct wssl_ctx *)connssl->backend;
+  data = CF_DATA_CURRENT(cf);
   DEBUGASSERT(data);
   if(!data || (blen < 0)) {
     wssl->io_result = CURLE_FAILED_INIT;
