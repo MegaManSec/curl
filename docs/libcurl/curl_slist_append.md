@@ -73,7 +73,8 @@ int main(void)
 
 # RETURN VALUE
 
-A null pointer is returned if anything went wrong, otherwise the new list
-pointer is returned. To avoid overwriting an existing non-empty list on
-failure, the new list should be returned to a temporary variable which can
-be tested for NULL before updating the original list pointer.
+A null pointer is returned if anything went wrong, including when **string**
+is NULL, otherwise the new list pointer is returned. To avoid overwriting an
+existing non-empty list on failure, the new list should be returned to a
+temporary variable which can be tested for NULL before updating the original
+list pointer.
