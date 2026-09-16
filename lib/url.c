@@ -160,6 +160,8 @@ void Curl_freeset(struct Curl_easy *data)
   curlx_safefree(data->set.str_copypostfields);
 
   for(j = (enum dupblob)0; j < BLOB_LAST; j++) {
+    if(data->set.blobs[j] && (data->set.blobs[j]->flags & CURL_BLOB_COPY))
+      curlx_memzero(data->set.blobs[j]->data, data->set.blobs[j]->len);
     curlx_safefree(data->set.blobs[j]);
   }
 
