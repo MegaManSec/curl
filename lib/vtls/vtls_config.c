@@ -71,6 +71,8 @@ static CURLcode blobdup(struct curl_blob **dest, struct curl_blob *src)
   if(src) {
     /* only if there is data to dupe! */
     struct curl_blob *d;
+    if(src->len > SIZE_MAX - sizeof(struct curl_blob))
+      return CURLE_OUT_OF_MEMORY;
     d = curlx_malloc(sizeof(struct curl_blob) + src->len);
     if(!d)
       return CURLE_OUT_OF_MEMORY;
