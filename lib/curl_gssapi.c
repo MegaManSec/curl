@@ -157,6 +157,11 @@ static OM_uint32 stub_gss_init_sec_context(
       return GSS_S_FAILURE;
     }
 
+    if(!input_token->value) {
+      *min = STUB_GSS_SERVER_ERR;
+      return GSS_S_FAILURE;
+    }
+
     /* Server response, either D (RA==) or C (Qw==) */
     if(((char *)input_token->value)[0] == 'D') {
       /* Done */
