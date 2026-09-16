@@ -119,6 +119,7 @@ struct testcase {
   int ofile;        /* file descriptor for output file when uploading to us */
 
   int writedelay;   /* number of seconds between each packet */
+  int wrq_send_data; /* send a bogus DATA packet instead of ACK for a WRQ */
 };
 
 struct formats {
@@ -565,6 +566,10 @@ static int tftpd_parse_servercmd(struct testcase *req)
         logmsg("instructed to delay %d secs between packets", num);
         req->writedelay = num;
       }
+      else if(!strncmp(cmd, "wrq_send_data", 13)) {
+        logmsg("instructed to send DATA instead of ACK for WRQ");
+        req->wrq_send_data = 1;
+      }
       else {
         logmsg("Unknown <servercmd> instruction found: %s", cmd);
       }
@@ -790,6 +795,16 @@ static void recvtftp(struct testcase *test, const struct formats *pf)
   mysignal(SIGALRM, timer);
 #endif
   rap = &ackbuf.hdr;
+
+  if(test->wrq_send_data) {
+    static const char payload[] = "bogus data from server";
+    rap->th_opcode = htons(opcode_DATA);
+    rap->th_block = htons(1);
+    memcpy(rap->th_data, payload, sizeof(payload) - 1);
+    (void)swrite(peer, &ackbuf.storage[0], 4 + sizeof(payload) - 1);
+    return;
+  }
+
   do {
     timeout = 0;
     rap->th_opcode = htons(opcode_ACK);
