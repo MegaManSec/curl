@@ -129,6 +129,10 @@ static CURLcode test_unit3212(const char *arg)
   Curl_uint32_tbl_remove(&tbl, 17);
   fail_unless(Curl_uint32_tbl_add(&tbl, &dummy, &key), "failed to add again");
   fail_unless(key == 17, "unexpected key assigned");
+  /* remove of an out of range key must be a safe no-op */
+  n = Curl_uint32_tbl_count(&tbl);
+  Curl_uint32_tbl_remove(&tbl, UINT32_MAX);
+  fail_unless(Curl_uint32_tbl_count(&tbl) == n, "wrong count after remove");
 
   UNITTEST_END(t3212_stop(&tbl))
 }
