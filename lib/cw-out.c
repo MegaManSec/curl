@@ -261,6 +261,13 @@ static CURLcode cw_out_ptr_flush(struct cw_out_ctx *ctx,
       *pconsumed += nwritten;
       blen -= nwritten;
       buf += nwritten;
+      if(blen) {
+        /* callback/userdata may also change between chunks */
+        cw_get_writefunc(data, otype, &wcb, &wcb_data,
+                         &max_write, &min_write);
+        if(!wcb)
+          break;
+      }
     }
   }
   return CURLE_OK;
