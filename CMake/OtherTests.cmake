@@ -134,6 +134,10 @@ if(NOT DEFINED HAVE_GETADDRINFO_THREADSAFE)
   endif()
 endif()
 
+if(NOT DEFINED HAVE_GETADDRINFO_THREADSAFE)
+  set(HAVE_GETADDRINFO_THREADSAFE TRUE)
+endif()
+
 if(NOT WIN32 AND NOT DEFINED HAVE_CLOCK_GETTIME_MONOTONIC_RAW)
   set(_source_epilogue "#undef inline")
   curl_add_header_include(HAVE_SYS_TYPES_H "sys/types.h")
