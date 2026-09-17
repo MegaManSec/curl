@@ -3091,10 +3091,13 @@ CURLcode Curl_http(struct Curl_easy *data, bool *done)
   /* select host to send */
   result = http_set_aptr_host(data);
   /* setup the authentication headers, how that method and host are known */
-  if(!result)
+  if(!result) {
+    const char *target = CURL_EASY_STR(data, STRING_TARGET);
     result = Curl_http_output_auth(data, data->conn, method, httpreq,
-                                   data->state.up.path,
-                                   data->state.up.query, FALSE);
+                                   target ? target : data->state.up.path,
+                                   target ? NULL : data->state.up.query,
+                                   FALSE);
+  }
   /* Setup input reader, resume information and ranges */
   if(!result)
     result = set_reader(data, httpreq);
