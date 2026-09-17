@@ -44,6 +44,12 @@ Import of session tickets from other curl versions may fail due to changes
 in the handling of **shmac** or **sdata**. A session ticket which has
 already expired is silently discarded.
 
+**sdata** is not integrity protected: anything with write access to where
+**sdata** is stored between export and import can alter it undetected. A
+session resumed from an imported ticket therefore never skips a real TLS
+verification, even where a session resumed from curl's own session cache
+in the same process could.
+
 # %PROTOCOLS%
 
 # EXAMPLE

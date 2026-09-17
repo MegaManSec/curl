@@ -164,3 +164,20 @@ diminishes over time when keys are rediscovered. Note that this also works for
 putting a new ticket into the cache: when no present entry matches, a new one
 with peer key is created. This peer key then no longer bears the cost of hash
 computes.
+
+#### Session Data Trust
+
+The salted hash and HMAC described above only authenticate the *peer key*,
+that is: which host and TLS configuration a ticket belongs to. They do not
+authenticate the *contents* of the exported session data (`sdata`) itself.
+Anyone able to write to wherever session data is persisted between export
+and import can alter `sdata` for a peer key they already know, without
+detection.
+
+Because of this, curl never trusts state carried inside imported session
+data that would let it skip a genuine TLS verification later on. For
+example, a session that records that its certificate chain was verified
+using Apple SecTrust has that fact discarded on import: a session
+resumed from imported data always goes through full peer verification
+again, even though the same session, when resumed from curl's own
+in-memory cache within the same process, would not need to.

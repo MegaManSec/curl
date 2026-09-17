@@ -94,6 +94,11 @@ A binary blob of **sdata_len** bytes, **sdata** contains all relevant
 SSL session ticket information for a later import - apart from **session_key**
 and **shmac**.
 
+**sdata** is not integrity protected the way **shmac** is. Anyone able to
+modify **sdata** while it is stored can tamper with it undetected, so a
+session resumed from imported data is never trusted to have been verified
+already and always goes through full TLS verification again.
+
 ## valid_until
 
 Seconds since EPOCH (1970-01-01) until the session ticket is considered
