@@ -63,6 +63,13 @@
 
 #include <proto/bsdsocket.h>
 
+#ifdef USE_RESOLV_THREADED
+#include "curl_threads.h"
+static curl_mutex_t amiga_resolver_mutex;
+static bool amiga_resolver_mutex_init = FALSE;
+static unsigned int amiga_resolver_active = 0;
+#endif
+
 static struct SocketIFace *__CurlISocket = NULL;
 static uint32 SocketFeatures = 0;
 
@@ -73,6 +80,13 @@ CURLcode Curl_amiga_init(void)
 {
   struct SocketIFace *ISocket;
   struct Library *base = OpenLibrary("bsdsocket.library", 4);
+
+#ifdef USE_RESOLV_THREADED
+  if(!amiga_resolver_mutex_init) {
+    Curl_mutex_init(&amiga_resolver_mutex);
+    amiga_resolver_mutex_init = TRUE;
+  }
+#endif
 
   if(base) {
     ISocket = (struct SocketIFace *)GetInterface(base, "main", 1, NULL);
@@ -101,12 +115,22 @@ CURLcode Curl_amiga_init(void)
 
 void Curl_amiga_cleanup(void)
 {
+#ifdef USE_RESOLV_THREADED
+  Curl_mutex_acquire(&amiga_resolver_mutex);
+  if(amiga_resolver_active) {
+    Curl_mutex_release(&amiga_resolver_mutex);
+    return;
+  }
+#endif
   if(__CurlISocket) {
     struct Library *base = __CurlISocket->Data.LibBase;
     DropInterface((struct Interface *)__CurlISocket);
     CloseLibrary(base);
     __CurlISocket = NULL;
   }
+#ifdef USE_RESOLV_THREADED
+  Curl_mutex_release(&amiga_resolver_mutex);
+#endif
 }
 
 #ifdef CURLRES_AMIGA
@@ -128,17 +152,35 @@ struct Curl_addrinfo *Curl_ipv4_resolve_r(const char *hostname, uint16_t port)
     LONG h_errnop = 0;
     struct hostent *buf;
 
-    buf = curlx_calloc(1, CURL_HOSTENT_SIZE);
-    if(buf) {
-      h = gethostbyname_r((STRPTR)hostname, buf,
-                          (char *)buf + sizeof(struct hostent),
-                          CURL_HOSTENT_SIZE - sizeof(struct hostent),
-                          &h_errnop);
-      if(h) {
-        ai = Curl_he2ai(h, port);
+#ifdef USE_RESOLV_THREADED
+    Curl_mutex_acquire(&amiga_resolver_mutex);
+    ISocket = __CurlISocket;
+    if(ISocket)
+      amiga_resolver_active++;
+    Curl_mutex_release(&amiga_resolver_mutex);
+#endif
+
+    if(ISocket) {
+      buf = curlx_calloc(1, CURL_HOSTENT_SIZE);
+      if(buf) {
+        h = gethostbyname_r((STRPTR)hostname, buf,
+                            (char *)buf + sizeof(struct hostent),
+                            CURL_HOSTENT_SIZE - sizeof(struct hostent),
+                            &h_errnop);
+        if(h) {
+          ai = Curl_he2ai(h, port);
+        }
+        curlx_free(buf);
       }
-      curlx_free(buf);
     }
+
+#ifdef USE_RESOLV_THREADED
+    if(ISocket) {
+      Curl_mutex_acquire(&amiga_resolver_mutex);
+      amiga_resolver_active--;
+      Curl_mutex_release(&amiga_resolver_mutex);
+    }
+#endif
   }
   else {
 #ifdef USE_RESOLV_THREADED
