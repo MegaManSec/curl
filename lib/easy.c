@@ -552,16 +552,17 @@ static void events_setup(struct Curl_multi *multi, struct events *ev)
 
 /* populate_fds()
  *
- * populate the fds[] array
+ * populate the fds[] array, never writing more than 'cap' entries
  */
-static unsigned int populate_fds(struct pollfd *fds, struct events *ev)
+static unsigned int populate_fds(struct pollfd *fds, unsigned int cap,
+                                  struct events *ev)
 {
   unsigned int numfds = 0;
   struct pollfd *f;
   struct socketmonitor *m;
 
   f = &fds[0];
-  for(m = ev->list; m; m = m->next) {
+  for(m = ev->list; m && (numfds < cap); m = m->next) {
     f->fd = m->socket.fd;
     f->events = m->socket.events;
     f->revents = 0;
@@ -622,7 +623,7 @@ static CURLcode wait_or_timeout(struct Curl_multi *multi, struct events *ev)
     struct pollfd fds[4];
     int pollrc;
     struct curltime start;
-    const unsigned int numfds = populate_fds(fds, ev);
+    const unsigned int numfds = populate_fds(fds, CURL_ARRAYSIZE(fds), ev);
 
     /* get the time stamp to use to figure out how long poll takes */
     curlx_pnow(&start);
