@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+TLS
+</keywords>
+</info>
+
+# Client-side
+<client>
+<features>
+unittest
+SSL
+</features>
+<name>
+TLS session cache import must not unlock a lock it never took
+</name>
+</client>
+</testcase>
