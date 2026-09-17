@@ -54,6 +54,11 @@ should be specified using the mailing list name, such as `Friends` or
 Using this option multiple times makes the last set list override the previous
 ones. Set it to NULL to disable its use again.
 
+None of the recipients may contain a CR or LF character. libcurl fails the
+transfer with CURLE_BAD_FUNCTION_ARGUMENT if one is found, since such a
+recipient could otherwise inject extra SMTP commands, in particular when
+used together with CURLOPT_CUSTOMREQUEST(3).
+
 # DEFAULT
 
 NULL

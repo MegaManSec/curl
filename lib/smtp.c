@@ -888,6 +888,12 @@ static CURLcode smtp_perform_command(struct Curl_easy *data,
       curlx_free(address);
     }
     else {
+      if(strpbrk(smtp->rcpt->data, "\r\n")) {
+        failf(data, "Refusing to send custom command with a CR or LF in "
+              "the recipient");
+        return CURLE_BAD_FUNCTION_ARGUMENT;
+      }
+
       /* Establish whether we should report that we support SMTPUTF8 for EXPN
          commands to the server as per RFC-6531 sect. 3.1 point 6 */
       utf8 = smtpc->utf8_supported && !strcmp(smtp->custom, "EXPN");
