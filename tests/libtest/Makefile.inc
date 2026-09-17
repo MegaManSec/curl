@@ -245,6 +245,7 @@ TESTS_C = \
   lib1686.c \
   lib1727.c \
   lib1791.c \
+  lib1850.c \
   lib1900.c \
   lib1901.c \
   lib1902.c \
