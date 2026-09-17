@@ -1166,8 +1166,10 @@ CURLcode Curl_mime_duppart(struct Curl_easy *data,
       result = CURLE_OK;
     break;
   case MIMEKIND_CALLBACK:
+    /* The source's arg is opaque and cannot be cloned: the duplicate
+       shares it for reading, but never takes ownership of freeing it. */
     result = curl_mime_data_cb(dst, src->datasize, src->readfunc,
-                               src->seekfunc, src->freefunc, src->arg);
+                               src->seekfunc, NULL, src->arg);
     break;
   case MIMEKIND_MULTIPART:
     /* No one knows about the cloned subparts, thus always attach ownership

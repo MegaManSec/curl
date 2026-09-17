@@ -96,9 +96,11 @@ done by instead reading from the input or similar.
 
 Care must be taken if the part is bound to a curl easy handle that is later
 duplicated: the *arg* pointer argument is also duplicated, resulting in
-the pointed item to be shared between the original and the copied handle. In
-particular, special attention should be given to the *freefunc* procedure
-code since it then gets called twice with the same argument.
+the pointed item to be shared between the original and the copied handle, for
+reading purposes. The duplicate never invokes *freefunc*: only the original
+handle owns *arg* and is responsible for eventually freeing it. This also
+means that if duplication of the easy handle fails partway through, *arg* is
+guaranteed to be left untouched and still owned by the original handle.
 
 # %PROTOCOLS%
 

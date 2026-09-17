@@ -141,14 +141,15 @@ static CURLcode test_lib654(const char *URL)
     goto test_cleanup;
   }
 
-  /* Free the duplicated handle: it should call free_callback again.
+  /* Free the duplicated handle: the duplicate does not own the callback
+     part's freefunc, so this must not call free_callback again.
      If the mime copy was bad or not automatically released, valgrind
      signals it. */
   curl_easy_cleanup(curl2);
   curl2 = NULL;  /* Already cleaned up. */
 
-  if(pooh.freecount != 2) {
-    curl_mfprintf(stderr, "free_callback() called %d times instead of 2\n",
+  if(pooh.freecount != 1) {
+    curl_mfprintf(stderr, "free_callback() called %d times instead of 1\n",
                   pooh.freecount);
     result = TEST_ERR_FAILURE;
     goto test_cleanup;
