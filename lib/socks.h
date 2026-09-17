@@ -42,6 +42,19 @@ CURLcode Curl_blockread_all(struct Curl_cfilter *cf,
                             size_t blen,
                             size_t *pnread);
 
+/*
+ * Helper write-to-socket function. Does the same as Curl_blockread_all but
+ * for sending. Blocks until all bytes amount of buffersize have been sent
+ * or the connect timeout expires. No more, no less.
+ *
+ * This is STUPID BLOCKING behavior
+ */
+CURLcode Curl_blockwrite_all(struct Curl_cfilter *cf,
+                             struct Curl_easy *data,
+                             const void *buf,
+                             size_t blen,
+                             size_t *pnwritten);
+
 #if defined(HAVE_GSSAPI) || defined(USE_WINDOWS_SSPI)
 /*
  * This function handles the SOCKS5 GSS-API negotiation and initialization

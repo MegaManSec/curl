@@ -177,15 +177,15 @@ static CURLcode socks5_sspi_loop(struct Curl_cfilter *cf,
       us_length = htons((unsigned short)sspi_send_token.cbBuffer);
       memcpy(socksreq + 2, &us_length, sizeof(short));
 
-      code = Curl_conn_cf_send(cf->next, data, socksreq, 4, FALSE, &written);
+      code = Curl_blockwrite_all(cf, data, socksreq, 4, &written);
       if(code || (written != 4)) {
         failf(data, "Failed to send SSPI authentication request.");
         return socks5_free_token(&sspi_send_token, CURLE_COULDNT_CONNECT);
       }
 
-      code = Curl_conn_cf_send(cf->next, data,
-                               sspi_send_token.pvBuffer,
-                               sspi_send_token.cbBuffer, FALSE, &written);
+      code = Curl_blockwrite_all(cf, data,
+                                 sspi_send_token.pvBuffer,
+                                 sspi_send_token.cbBuffer, &written);
       if(code || (sspi_send_token.cbBuffer != written)) {
         failf(data, "Failed to send SSPI authentication token.");
         return socks5_free_token(&sspi_send_token, CURLE_COULDNT_CONNECT);
@@ -359,7 +359,7 @@ static CURLcode socks5_sspi_encrypt(struct Curl_cfilter *cf,
     memcpy(socksreq + 2, &us_length, sizeof(short));
   }
 
-  code = Curl_conn_cf_send(cf->next, data, socksreq, 4, FALSE, &written);
+  code = Curl_blockwrite_all(cf, data, socksreq, 4, &written);
   if(code || (written != 4)) {
     failf(data, "Failed to send SSPI encryption request.");
     curlx_free(etbuf);
@@ -368,15 +368,14 @@ static CURLcode socks5_sspi_encrypt(struct Curl_cfilter *cf,
 
   if(data->set.socks5_gssapi_nec) {
     memcpy(socksreq, &gss_enc, 1);
-    code = Curl_conn_cf_send(cf->next, data, socksreq, 1, FALSE, &written);
+    code = Curl_blockwrite_all(cf, data, socksreq, 1, &written);
     if(code || (written != 1)) {
       failf(data, "Failed to send SSPI encryption type.");
       return CURLE_COULDNT_CONNECT;
     }
   }
   else {
-    code = Curl_conn_cf_send(cf->next, data, etbuf, etbuf_size, FALSE,
-                             &written);
+    code = Curl_blockwrite_all(cf, data, etbuf, etbuf_size, &written);
     curlx_free(etbuf);
     if(code || (etbuf_size != written)) {
       failf(data, "Failed to send SSPI encryption type.");
