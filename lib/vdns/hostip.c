@@ -850,12 +850,12 @@ static CURLcode resolv_alarm_timeout(struct Curl_easy *data,
                                      struct Curl_dns_entry **entry)
 {
 #ifdef HAVE_SIGACTION
-  struct sigaction keep_sigact; /* store the old struct here */
+  volatile struct sigaction keep_sigact; /* store the old struct here */
   volatile bool keep_copysig = FALSE; /* whether old sigact has been saved */
   struct sigaction sigact;
 #else
 #ifdef HAVE_SIGNAL
-  void (*keep_sigact)(int);       /* store the old handler here */
+  void (* volatile keep_sigact)(int); /* store the old handler here */
 #endif /* HAVE_SIGNAL */
 #endif /* HAVE_SIGACTION */
   volatile long timeout;
@@ -935,7 +935,8 @@ clean_up:
   if(keep_copysig) {
     /* we got a struct as it looked before, now put that one back nice
        and clean */
-    sigaction(SIGALRM, &keep_sigact, NULL); /* put it back */
+    struct sigaction old_sigact = keep_sigact;
+    sigaction(SIGALRM, &old_sigact, NULL); /* put it back */
   }
 #else
 #ifdef HAVE_SIGNAL
