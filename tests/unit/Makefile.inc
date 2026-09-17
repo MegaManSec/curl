@@ -128,3 +128,5 @@ TESTS_C = \
   unit3310.c \
   unit3311.c \
   unit3400.c
+  unit3400.c \
+  unit4002.c

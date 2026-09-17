@@ -551,6 +551,8 @@ static CURLFORMcode formadd(struct curl_httppost **httppost,
       avalue = form_ptr_arg(char *);
       if(Curl_bufref_ptr(&curr->showfilename))
         retval = CURL_FORMADD_OPTION_TWICE;
+      else if(!avalue)
+        retval = CURL_FORMADD_NULL;
       else if(Curl_bufref_memdup0(&curr->showfilename, avalue, strlen(avalue)))
         retval = CURL_FORMADD_MEMORY;
       break;
@@ -599,6 +601,7 @@ static CURLFORMcode formadd(struct curl_httppost **httppost,
  * curl_formadd() is a public API to add a section to the multipart formpost.
  *
  * @unittest: 1308
+ * @unittest: 4002
  */
 
 CURLFORMcode curl_formadd(struct curl_httppost **httppost,
