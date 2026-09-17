@@ -107,10 +107,10 @@ completed.
 
 For libcurl builds using TLS backends that support CA caching and
 CURLOPT_CA_CACHE_TIMEOUT(3) is not set to zero, multiple calls to this
-callback may be done with the same CA store in memory. With the wolfSSL
-backend, a connection that sets this callback is excluded from that cache
-and always gets its own independent CA store, so changes this callback
-makes to the store are not visible to other transfers.
+callback may be done with the same CA store in memory. With the OpenSSL and
+wolfSSL backends, a connection that sets this callback is excluded from
+that cache and always gets its own independent CA store, so changes this
+callback makes to the store are not visible to other transfers.
 
 # DEFAULT
 
