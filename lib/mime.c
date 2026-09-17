@@ -1396,6 +1396,9 @@ CURLcode curl_mime_type(curl_mimepart *part, const char *mimetype)
   if(!part)
     return CURLE_BAD_FUNCTION_ARGUMENT;
 
+  if(mimetype && mimetype[strcspn(mimetype, "\r\n")])
+    return CURLE_BAD_FUNCTION_ARGUMENT;
+
   curlx_safefree(part->mimetype);
 
   if(mimetype) {
