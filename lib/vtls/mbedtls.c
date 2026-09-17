@@ -509,7 +509,8 @@ static CURLcode mbed_load_cacert(struct Curl_cfilter *cf,
     /* if DER or a null-terminated PEM process using
        mbedtls_x509_crt_parse(). */
     if((ssl_cert_type && curl_strequal(ssl_cert_type, "DER")) ||
-       ((char *)(ca_info_blob->data))[ca_info_blob->len - 1] == '\0') {
+       (ca_info_blob->len &&
+        ((char *)(ca_info_blob->data))[ca_info_blob->len - 1] == '\0')) {
       ret = mbedtls_x509_crt_parse(&backend->cacert, ca_info_blob->data,
                                    ca_info_blob->len);
     }
@@ -621,7 +622,8 @@ static CURLcode mbed_load_clicert(struct Curl_cfilter *cf,
     /* if DER or a null-terminated PEM process using
        mbedtls_x509_crt_parse(). */
     if((ssl_cert_type && curl_strequal(ssl_cert_type, "DER")) ||
-       ((char *)(ssl_cert_blob->data))[ssl_cert_blob->len - 1] == '\0') {
+       (ssl_cert_blob->len &&
+        ((char *)(ssl_cert_blob->data))[ssl_cert_blob->len - 1] == '\0')) {
 
       ret = mbedtls_x509_crt_parse(&backend->clicert,
                                    ssl_cert_blob->data,
