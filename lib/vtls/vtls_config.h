@@ -122,7 +122,8 @@ bool Curl_ssl_conn_config_match(struct Curl_easy *data,
 
 /* Update certain connection SSL config flags after they have
  * been changed on the easy handle. Works for `verifypeer`,
- * `verifyhost` and `verifystatus`. */
+ * `verifyhost` and `verifystatus`. Only has an effect while the
+ * connection has not completed its handshake yet. */
 void Curl_ssl_conn_config_update(struct Curl_easy *data, bool for_proxy);
 
 #endif /* HEADER_CURL_VTLS_CONFIG_H */

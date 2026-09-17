@@ -43,6 +43,7 @@
 #include "urldata.h"
 #include "setopt.h"
 #include "strcase.h"
+#include "cfilters.h"
 #include "vtls/vtls.h"
 #include "vtls/vtls_config.h"
 
@@ -449,6 +450,12 @@ void Curl_ssl_conn_config_update(struct Curl_easy *data, bool for_proxy)
   if(data->conn) {
     struct ssl_easy_config *src;
     struct ssl_filter_config *dest;
+
+    /* Once the connection has completed its handshake, its recorded
+       verification settings must stay as they were established with */
+    if(Curl_conn_is_connected(data->conn, FIRSTSOCKET))
+      return;
+
 #ifndef CURL_DISABLE_PROXY
     src = for_proxy ? &data->set.proxy_ssl : &data->set.ssl;
     dest = for_proxy ? &data->conn->proxy_ssl_config : &data->conn->ssl_config;

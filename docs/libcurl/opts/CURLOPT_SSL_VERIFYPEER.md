@@ -76,6 +76,14 @@ governed by process-global state instead of this per-handle option. When
 libcurl is built with USE_OPENLDAP, the OpenLDAP backend routes TLS through
 curl's layer and this option is honored.
 
+Changing this option on an easy handle that is currently attached to a
+connection only affects that connection's handshake if it has not
+completed yet. It never retroactively relabels an already established
+connection: libcurl does not reuse a connection that was verified with a
+weaker policy to satisfy a later, stricter request, and it does not skip
+verification on a connection that was itself established with strict
+verification.
+
 # DEFAULT
 
 1 - enabled
