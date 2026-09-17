@@ -66,6 +66,7 @@ TESTS_C = \
   cli_upload_pausing.c \
   cli_ws_data.c \
   cli_ws_pause.c \
+  cli_ws_ping_desync.c \
   cli_ws_pingpong.c \
   cli_ws_write_err.c \
   \

@@ -1048,7 +1048,9 @@ static CURLcode ws_enc_add_pending(struct Curl_easy *data,
 
   if(!ws->pending.type) /* no pending frame here */
     return CURLE_OK;
-  if(ws->enc.payload_remain) /* in the middle of another frame */
+  if(ws->enc.payload_remain || ws->sendbuf_payload)
+    /* in the middle of another frame, or a previous send's payload
+       is still sitting unflushed in sendbuf */
     return CURLE_AGAIN;
 
   result = ws_enc_add_frame(data, &ws->enc, ws->pending.type,

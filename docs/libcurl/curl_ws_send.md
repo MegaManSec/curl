@@ -43,6 +43,10 @@ must call this function again until all payload is processed. *buffer* and
 *buflen* must be updated on every following invocation to only point to the
 remaining piece of the payload.
 
+An automatic PONG sent in response to a received PING (see libcurl-ws(3))
+never gets sent in between such follow-up calls, so *sent* always reflects
+progress on the frame being sent, undisturbed by such control frame traffic.
+
 *fragsize* should always be set to zero unless a (huge) frame shall be sent
 using multiple calls with partial content per call explicitly. In that
 case you must set the *CURLWS_OFFSET* bit and set the *fragsize* as documented
