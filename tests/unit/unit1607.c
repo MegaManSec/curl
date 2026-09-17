@@ -38,19 +38,47 @@ struct t1607_key {
   size_t len;
 };
 
+#define T1607_KEY_HASHLEN 8
+#define T1607_LONGHOST_LEN 280
+#define T1607_COMMON_LEN 260
+
+static uint64_t t1607_name_hash(const char *name, size_t len)
+{
+  uint64_t hash = 0xcbf29ce484222325ULL;
+  size_t i;
+
+  for(i = 0; i < len; i++) {
+    hash ^= (uint8_t)Curl_raw_tolower(name[i]);
+    hash *= 0x100000001b3ULL;
+  }
+  return hash;
+}
+
 static void t1607_create_key(struct t1607_key *key,
                              const char *hostname,
                              uint16_t port,
                              uint8_t type)
 {
+  size_t avail = sizeof(key->data) - 3;
   size_t namelen = strlen(hostname);
-  if(namelen > (sizeof(key->data) - 3))
-    namelen = sizeof(key->data) - 3;
-  /* store and lower case the name */
+
   key->data[0] = type;
   key->data[1] = (uint8_t)((port >> 8) & 0xff);
   key->data[2] = (uint8_t)(port & 0xff);
-  Curl_strntolower((char *)key->data + 3, hostname, namelen);
+
+  if(namelen > avail) {
+    uint64_t hash = t1607_name_hash(hostname, namelen);
+    size_t i;
+
+    namelen = avail - T1607_KEY_HASHLEN;
+    Curl_strntolower((char *)key->data + 3, hostname, namelen);
+    for(i = 0; i < T1607_KEY_HASHLEN; i++)
+      key->data[3 + namelen + i] = (uint8_t)(hash >> (i * 8));
+    namelen += T1607_KEY_HASHLEN;
+  }
+  else
+    Curl_strntolower((char *)key->data + 3, hostname, namelen);
+
   key->len = namelen + 3;
 }
 
@@ -243,6 +271,98 @@ static CURLcode test_unit1607(const char *arg)
       continue;
     }
   }
+
+  /* Two long hostnames that share the same truncated key prefix must not
+     alias to the same DNS cache entry. */
+  {
+    char h1[T1607_LONGHOST_LEN + 1];
+    char h2[T1607_LONGHOST_LEN + 1];
+    char optval[T1607_LONGHOST_LEN + 60];
+    struct t1607_key key1;
+    struct t1607_key key2;
+    struct Curl_dns_entry *dns1;
+    struct Curl_dns_entry *dns2;
+    struct Curl_addrinfo *addr;
+    char ipaddress[MAX_IPADR_LEN] = { 0 };
+    uint16_t port = 0;
+    bool alias_problem = FALSE;
+
+    /* h1 and h2 share their first T1607_COMMON_LEN bytes (which is beyond
+       the old, unconditionally-truncated key prefix length of 255 bytes)
+       and differ only after that. */
+    memset(h1, 'a', T1607_LONGHOST_LEN);
+    h1[T1607_LONGHOST_LEN] = '\0';
+    memset(h2, 'a', T1607_LONGHOST_LEN);
+    h2[T1607_LONGHOST_LEN] = '\0';
+    memcpy(h2 + T1607_COMMON_LEN, "differs-after-cutoff",
+          strlen("differs-after-cutoff"));
+
+    easy = curl_easy_init();
+    if(!easy)
+      goto error;
+    multi = curl_multi_init();
+    curl_multi_add_handle(multi, easy);
+
+    curl_msnprintf(optval, sizeof(optval), "%s:8080:127.0.0.1", h1);
+    list = curl_slist_append(NULL, optval);
+    curl_msnprintf(optval, sizeof(optval), "%s:8080:127.0.0.2", h2);
+    list = curl_slist_append(list, optval);
+    if(!list)
+      goto error;
+    curl_easy_setopt(easy, CURLOPT_RESOLVE, list);
+
+    Curl_loadhostpairs(easy);
+
+    t1607_create_key(&key1, h1, 8080, CURL_DNST_ADDR);
+    t1607_create_key(&key2, h2, 8080, CURL_DNST_ADDR);
+
+    if(key1.len == key2.len && !memcmp(key1.data, key2.data, key1.len)) {
+      curl_mfprintf(stderr, "%s:%d truncated-hostname alias test failed. "
+                    "two different long hostnames produced the same "
+                    "cache key.\n", __FILE__, __LINE__);
+      alias_problem = TRUE;
+    }
+
+    dns1 = Curl_hash_pick(&multi->dnscache.entries, key1.data, key1.len);
+    dns2 = Curl_hash_pick(&multi->dnscache.entries, key2.data, key2.len);
+
+    if(!dns1 || !dns2) {
+      curl_mfprintf(stderr, "%s:%d truncated-hostname alias test failed. "
+                    "did not find both cache entries.\n",
+                    __FILE__, __LINE__);
+      alias_problem = TRUE;
+    }
+    else {
+      addr = dns1->addr;
+      if(!addr || sockaddr2string(addr->ai_addr, addr->ai_addrlen,
+                                  ipaddress, &port) ||
+         !curl_strequal(ipaddress, "127.0.0.1")) {
+        curl_mfprintf(stderr, "%s:%d h1 resolved to the wrong address.\n",
+                      __FILE__, __LINE__);
+        alias_problem = TRUE;
+      }
+
+      addr = dns2->addr;
+      if(!addr || sockaddr2string(addr->ai_addr, addr->ai_addrlen,
+                                  ipaddress, &port) ||
+         !curl_strequal(ipaddress, "127.0.0.2")) {
+        curl_mfprintf(stderr, "%s:%d h2 resolved to the wrong address.\n",
+                      __FILE__, __LINE__);
+        alias_problem = TRUE;
+      }
+    }
+
+    curl_easy_cleanup(easy);
+    easy = NULL;
+    curl_multi_cleanup(multi);
+    multi = NULL;
+    curl_slist_free_all(list);
+    list = NULL;
+
+    if(alias_problem)
+      unitfail++;
+  }
+
 error:
   curl_easy_cleanup(easy);
   curl_multi_cleanup(multi);

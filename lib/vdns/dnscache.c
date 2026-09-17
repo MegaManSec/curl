@@ -57,6 +57,7 @@
 #include "curlx/strparse.h"
 
 #define MAX_HOSTCACHE_LEN (255 + 3) /* max FQDN + type + port */
+#define DNSC_KEY_HASHLEN 8 /* trailer bytes for a truncated name's hash */
 
 #define MAX_DNS_CACHE_SIZE 29999
 
@@ -88,19 +89,52 @@ struct dnsc_key {
 };
 
 /*
+ * FNV-1a hash of the full, lowercased name. Only used to disambiguate
+ * names that are too long to store in a key without truncation.
+ */
+static uint64_t dnsc_name_hash(struct Curl_str *name)
+{
+  const char *s = curlx_str(name);
+  size_t len = curlx_strlen(name);
+  uint64_t hash = 0xcbf29ce484222325ULL;
+  size_t i;
+
+  for(i = 0; i < len; i++) {
+    hash ^= (uint8_t)Curl_raw_tolower(s[i]);
+    hash *= 0x100000001b3ULL;
+  }
+  return hash;
+}
+
+/*
  * Create a hostcache id string for the provided host + port, to be used by
  * the DNS caching. Without alloc. Return length of the id string.
  */
 static void dnsc_id2key(struct dnsc_key *key, struct dnsc_id *id)
 {
+  size_t avail = sizeof(key->data) - 3;
   size_t namelen = curlx_strlen(&id->name);
-  if(namelen > (sizeof(key->data) - 3))
-    namelen = sizeof(key->data) - 3;
-  /* store and lower case the name */
+
   key->data[0] = id->type;
   key->data[1] = (uint8_t)((id->port >> 8) & 0xff);
   key->data[2] = (uint8_t)(id->port & 0xff);
-  Curl_strntolower((char *)key->data + 3, curlx_str(&id->name), namelen);
+
+  if(namelen > avail) {
+    /* the name does not fit: store as much of it as fits and replace the
+       remainder with a hash of the full name, so two overlong names that
+       only share the stored prefix do not end up with the same key */
+    uint64_t hash = dnsc_name_hash(&id->name);
+    size_t i;
+
+    namelen = avail - DNSC_KEY_HASHLEN;
+    Curl_strntolower((char *)key->data + 3, curlx_str(&id->name), namelen);
+    for(i = 0; i < DNSC_KEY_HASHLEN; i++)
+      key->data[3 + namelen + i] = (uint8_t)(hash >> (i * 8));
+    namelen += DNSC_KEY_HASHLEN;
+  }
+  else
+    Curl_strntolower((char *)key->data + 3, curlx_str(&id->name), namelen);
+
   key->len = namelen + 3;
 }
 
