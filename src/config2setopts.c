@@ -357,7 +357,7 @@ static CURLcode ssl_ca_setopts(struct OperationConfig *config, CURL *curl)
       result = CURLE_OK;
     }
   }
-  if(!config->proxy_cacert && !config->proxy_capath) {
+  if(!config->proxy_cacert && !config->proxy_capath && !config->capath) {
     struct curl_blob blob;
     blob.data = CURL_UNCONST(curl_ca_embed);
     blob.len = strlen((const char *)curl_ca_embed);
