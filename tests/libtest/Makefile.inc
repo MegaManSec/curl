@@ -335,5 +335,6 @@ TESTS_C = \
   lib3231.c \
   lib3402.c \
   lib3595.c \
+  lib3598.c \
   lib5000.c \
   lib5004.c

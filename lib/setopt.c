@@ -49,6 +49,7 @@
 #include "escape.h"
 #include "bufref.h"
 #include "vauth/vauth.h"
+#include "curl_addrinfo.h"
 
 static CURLcode setopt_set_timeout_sec(timediff_t *ptimeout_ms, long secs)
 {
@@ -1737,6 +1738,8 @@ static CURLcode setopt_cptr_proxy(struct Curl_easy *data, CURLoption option,
     /*
      * Set the client IP to send through HAProxy PROXY protocol
      */
+    if(ptr && !Curl_is_ipaddr(ptr))
+      return CURLE_BAD_FUNCTION_ARGUMENT;
     result = Curl_setstropt(data, STRING_HAPROXY_CLIENT_IP, ptr);
 
     /* enable the HAProxy protocol if an IP is provided */
