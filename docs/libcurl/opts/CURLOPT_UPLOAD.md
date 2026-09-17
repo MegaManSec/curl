@@ -42,6 +42,11 @@ size before starting the transfer. The library enables this by adding a header
 chunked transfer, you must specify the size of the data with
 CURLOPT_INFILESIZE(3) or CURLOPT_INFILESIZE_LARGE(3).
 
+For SMTP, a line in the uploaded mail body that starts with a dot is
+escaped (dot-stuffed) regardless of whether the line before it ends in CRLF
+or a bare LF, so such a line cannot be mistaken for the end of the mail
+body.
+
 # DEFAULT
 
 0
