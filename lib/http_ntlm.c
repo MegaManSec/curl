@@ -90,16 +90,14 @@ CURLcode Curl_input_ntlm(struct Curl_easy *data,
         infof(data, "NTLM auth restarted");
         Curl_auth_ntlm_remove(conn, proxy);
       }
-      else if(*state == NTLMSTATE_TYPE3) {
-        infof(data, "NTLM handshake rejected");
+      else if(*state >= NTLMSTATE_TYPE1) {
+        infof(data, *state == NTLMSTATE_TYPE3 ?
+              "NTLM handshake rejected" :
+              "NTLM handshake failed, server sent no challenge");
         Curl_auth_ntlm_remove(conn, proxy);
         Curl_peer_unlink(&conn->creds_origin);
         Curl_creds_unlink(&conn->creds);
         *state = NTLMSTATE_NONE;
-        return CURLE_REMOTE_ACCESS_DENIED;
-      }
-      else if(*state >= NTLMSTATE_TYPE1) {
-        infof(data, "NTLM handshake failure (internal error)");
         return CURLE_REMOTE_ACCESS_DENIED;
       }
 
