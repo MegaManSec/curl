@@ -509,6 +509,9 @@ void Curl_conn_free(struct Curl_easy *data, struct connectdata *conn)
   Curl_peer_unlink(&conn->creds_origin);
   curlx_safefree(conn->options);
   curlx_safefree(conn->localdev);
+#ifndef CURL_DISABLE_PROXY
+  curlx_safefree(conn->haproxy_client_ip);
+#endif
   Curl_ssl_conn_config_cleanup(conn);
 
   curlx_safefree(conn->destination);
@@ -760,8 +763,31 @@ static bool url_match_proxy_use(struct connectdata *conn,
   }
   return TRUE;
 }
+
+/*
+ * url_match_haproxy()
+ *
+ * Verify that a candidate connection was established with the same
+ * HAProxy PROXY protocol state (enabled or not, and the same asserted
+ * client IP) as the requested transfer, so reuse cannot make a transfer's
+ * traffic be attributed by an HAProxy-aware upstream to another transfer's
+ * asserted client identity.
+ */
+static bool url_match_haproxy(struct connectdata *conn,
+                              struct url_conn_match *m)
+{
+  if(!m->needle->bits.haproxyprotocol != !conn->bits.haproxyprotocol)
+    return FALSE;
+
+  if(conn->bits.haproxyprotocol &&
+     !Curl_safecmp(m->needle->haproxy_client_ip, conn->haproxy_client_ip))
+    return FALSE;
+
+  return TRUE;
+}
 #else
 #define url_match_proxy_use(c, m) ((void)(c), (void)(m), TRUE)
+#define url_match_haproxy(c, m) ((void)(c), (void)(m), TRUE)
 #endif
 
 #ifndef CURL_DISABLE_HTTP
@@ -1014,6 +1040,10 @@ static bool url_match_conn(struct connectdata *conn, void *userdata)
 
   if(!url_match_proxy_use(conn, m))
     return FALSE;
+
+  if(!url_match_haproxy(conn, m))
+    return FALSE;
+
   if(!url_match_ssl_config(conn, m))
     return FALSE;
 
@@ -1158,6 +1188,19 @@ static struct connectdata *allocate_conn(struct Curl_easy *data)
   conn->localport = data->set.localport;
 #endif
 
+#ifndef CURL_DISABLE_PROXY
+  /* Store the HAProxy PROXY protocol state that will be used for this
+     connection, so a later transfer with a different setting cannot
+     reuse it. */
+  conn->bits.haproxyprotocol = data->set.haproxyprotocol;
+  if(CURL_EASY_STR(data, STRING_HAPROXY_CLIENT_IP)) {
+    conn->haproxy_client_ip =
+      curlx_strdup(CURL_EASY_STR(data, STRING_HAPROXY_CLIENT_IP));
+    if(!conn->haproxy_client_ip)
+      goto error;
+  }
+#endif
+
   /* the close socket stuff needs to be copied to the connection struct as
      it may live on without (this specific) Curl_easy */
   conn->fclosesocket = data->set.fclosesocket;
@@ -1169,6 +1212,9 @@ static struct connectdata *allocate_conn(struct Curl_easy *data)
 error:
 
   curlx_free(conn->localdev);
+#ifndef CURL_DISABLE_PROXY
+  curlx_free(conn->haproxy_client_ip);
+#endif
   curlx_free(conn);
   return NULL;
 }

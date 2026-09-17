@@ -47,9 +47,10 @@ libcurl rejects strings that are not a syntactically valid IPv4 or IPv6
 numerical address, so the resulting PROXY protocol header line cannot be
 manipulated by passing in extra characters such as CR or LF.
 
-Note that if you want to send a *different* HAProxy client IP in a subsequent
-request, you need to make sure that it is done over a fresh connection as
-libcurl does not send it again while reusing connections.
+A connection is only reused for a subsequent request if that request uses
+the same client IP (or lack thereof); otherwise libcurl transparently opens
+a new connection instead of resending this header on a connection
+established with a different client IP.
 
 # DEFAULT
 

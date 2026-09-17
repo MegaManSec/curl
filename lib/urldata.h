@@ -221,6 +221,10 @@ struct ConnectBits {
   BIT(shutdown_filters); /* connection shutdown: filters shut down */
   BIT(in_cpool);     /* connection is kept in a connection pool */
   BIT(dns_resolved); /* DNS records for connection were resolved */
+#ifndef CURL_DISABLE_PROXY
+  BIT(haproxyprotocol); /* connection was set up to send an HAProxy PROXY
+                           protocol preamble */
+#endif
 };
 
 struct hostname {
@@ -344,6 +348,10 @@ struct connectdata {
      that subsequent bound-requested connections are not accidentally reusing
      wrong connections. */
   char *localdev;
+#ifndef CURL_DISABLE_PROXY
+  char *haproxy_client_ip; /* client IP asserted in the HAProxy PROXY
+                              protocol preamble sent for this connection */
+#endif
   struct ConnectBits bits;    /* various state-flags for this connection */
 #if defined(HAVE_GSSAPI) || defined(USE_WINDOWS_SSPI)
   int socks5_gssapi_enctype;
