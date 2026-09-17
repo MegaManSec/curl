@@ -89,7 +89,7 @@ static const struct Curl_mapi_fn_props mapi_fn_props[CURL_MAPI_FN_LAST] = {
   { CURL_MAPI_FN_multi_notify_enable,  0,  1,   1,  0 },
   { CURL_MAPI_FN_multi_perform,        0,  0,   0,  1 },
   { CURL_MAPI_FN_multi_poll,           0,  0,   1,  0 },
-  { CURL_MAPI_FN_multi_remove_handle,  0,  0,   1,  0 },
+  { CURL_MAPI_FN_multi_remove_handle,  0,  0,   1,  1 },
   { CURL_MAPI_FN_multi_setopt,         0,  0,   1,  0 },
   { CURL_MAPI_FN_multi_socket_action,  0,  0,   0,  1 },
   { CURL_MAPI_FN_multi_socket_all,     0,  0,   0,  1 },
