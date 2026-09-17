@@ -1970,6 +1970,7 @@ TESTCASES = \
   test2310 \
   test2311 \
   test2312 \
+  test2313 \
   test2318 \
   test2349 \
   \

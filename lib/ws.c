@@ -760,9 +760,10 @@ static CURLcode ws_cw_write(struct Curl_easy *data,
     }
   }
 
-  if((type & CLIENTWRITE_EOS) && !Curl_bufq_is_empty(&ctx->buf)) {
-    failf(data, "[WS] decode ending with %zu frame bytes remaining",
-          Curl_bufq_len(&ctx->buf));
+  if((type & CLIENTWRITE_EOS) &&
+     (!Curl_bufq_is_empty(&ctx->buf) || ws->dec.state != WS_DEC_INIT)) {
+    failf(data, "[WS] decode ending with %zu frame bytes remaining, "
+          "decoder state %d", Curl_bufq_len(&ctx->buf), (int)ws->dec.state);
     result = CURLE_RECV_ERROR;
   }
 

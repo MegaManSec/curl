@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+WebSockets
+</keywords>
+</info>
+
+# Sends a TEXT frame header declaring a 20 byte payload, then only 8
+# payload bytes, then closes the connection.
+<reply>
+<data crlf="headers" nocheck="yes" nonewline="yes">
+HTTP/1.1 101 Switching to WebSockets swsclose
+Server: test-server/fake
+Upgrade: websocket
+Connection: Upgrade
+Something: else
+Sec-WebSocket-Accept: HkPsVga7+8LuxM4RGQ5p9tZHeYs=
+
+%hex[%81%14%73%6f%6d%65%62%79%74%65]hex%
+</data>
+# allow upgrade
+<servercmd>
+upgrade
+</servercmd>
+</reply>
+
+# Client-side
+<client>
+# require Debug for the forced CURL_ENTROPY
+<features>
+Debug
+ws
+</features>
+<setenv>
+CURL_ENTROPY=12345678
+</setenv>
+<server>
+http
+</server>
+<name>
+WebSockets via callback: connection closed mid-frame is an error
+</name>
+<tool>
+lib%TESTNUMBER
+</tool>
+<command>
+ws://%HOSTIP:%HTTPPORT/%TESTNUMBER
+</command>
+</client>
+
+<verify>
+<protocol crlf="headers" nocheck="yes">
+GET /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: websocket/2313
+Accept: */*
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: NDMyMTUzMjE2MzIxNzMyMQ==
+Connection: Upgrade
+
+</protocol>
+<stdout mode="text">
+73 6f 6d 65 62 79 74 65%SP
+</stdout>
+# 56 == CURLE_RECV_ERROR
+<errorcode>
+56
+</errorcode>
+</verify>
+</testcase>
