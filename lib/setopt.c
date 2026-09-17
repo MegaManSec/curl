@@ -2383,6 +2383,10 @@ static CURLcode setopt_cptr_misc(struct Curl_easy *data, CURLoption option,
     return Curl_setstropt(data, STRING_OPTIONS, ptr);
 
   case CURLOPT_XOAUTH2_BEARER:
+    if(ptr && strpbrk(ptr, "\r\n")) {
+      failf(data, "Refusing to set bearer token with a CR or LF");
+      return CURLE_BAD_FUNCTION_ARGUMENT;
+    }
     return Curl_setstropt(data, STRING_BEARER, ptr);
   case CURLOPT_RANGE:
     return Curl_setstropt(data, STRING_SET_RANGE, ptr);
