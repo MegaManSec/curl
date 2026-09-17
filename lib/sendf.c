@@ -178,6 +178,7 @@ static CURLcode cw_download_write(struct Curl_easy *data,
   CURLcode result;
   size_t nwrite, excess_len = 0;
   bool is_connect = !!(type & CLIENTWRITE_CONNECT);
+  bool filesize_exceeded = FALSE;
 
   if(!ctx->started_response &&
      !(type & CLIENTWRITE_CONNECT) &&
@@ -254,6 +255,7 @@ static CURLcode cw_download_write(struct Curl_easy *data,
     size_t wmax = get_max_body_write_len(data, data->set.max_filesize);
     if(nwrite > wmax) {
       nwrite = wmax;
+      filesize_exceeded = TRUE;
     }
   }
 
@@ -284,7 +286,7 @@ static CURLcode cw_download_write(struct Curl_easy *data,
       connclose(data->conn);
     }
   }
-  else if((nwrite < nbytes) && !data->req.ignorebody) {
+  if(filesize_exceeded && !data->req.ignorebody) {
     failf(data, "Exceeded the maximum allowed file size "
           "(%" FMT_OFF_T ") with %" FMT_OFF_T " bytes",
           data->set.max_filesize, data->req.bytecount);
