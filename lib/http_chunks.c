@@ -282,6 +282,13 @@ static CURLcode httpchunk_readwrite(struct Curl_easy *data,
               ch->last_code = CHUNKE_PASSTHRU_ERROR;
               return result;
             }
+
+            result = Curl_bump_headersize(data, trlen, ch->in_connect);
+            if(result) {
+              ch->state = CHUNK_FAILED;
+              ch->last_code = CHUNKE_BAD_CHUNK;
+              return result;
+            }
           }
           curlx_dyn_reset(&ch->trailer);
           ch->state = CHUNK_TRAILER_CR;
