@@ -1471,6 +1471,7 @@ TESTCASES = \
   test1448 \
   test1449 \
   test1450 \
+  test1451 \
   test1452 \
   test1453 \
   test1454 \
