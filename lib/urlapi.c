@@ -2215,8 +2215,8 @@ bool Curl_url_same_origin(CURLU *base, CURLU *href)
     else if(base->portnum != href->portnum) /* both present or missing */
       return FALSE;
 
-    if(!curl_strequal(base->zoneid ? base->zoneid : "",
-                      href->zoneid ? href->zoneid : ""))
+    if(strcmp(base->zoneid ? base->zoneid : "",
+              href->zoneid ? href->zoneid : ""))
       return FALSE;
   }
   else if(href->port_present) /* no host in href, then there must be no port */

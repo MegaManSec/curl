@@ -377,6 +377,59 @@ loop_end:
     }
     abort_if(fails, "same_origin tests failed");
   }
+
+  /* Test same origin check with IPv6 zone ids. */
+  {
+    CURLU *base, *href;
+    int fails = 0;
+    unsigned int i;
+    bool match;
+    struct origin_zoneid_test {
+      const char *base;
+      const char *href;
+      bool expect_match;
+    };
+    static const struct origin_zoneid_test tests[] = {
+      { "http://[fe80::1%25eth0]/", "http://[fe80::1%25eth0]/", TRUE },
+      { "http://[fe80::1%25eth0]/", "http://[fe80::1%25ETH0]/", FALSE },
+      { "http://[fe80::1%25eth0]/", "http://[fe80::1%25wlan0]/", FALSE },
+      { "http://[fe80::1%25eth0]/", "http://[fe80::1]/", FALSE },
+      { "http://[fe80::1]/", "http://[fe80::1]/", TRUE },
+    };
+
+    for(i = 0; i < CURL_ARRAYSIZE(tests); i++) {
+      CURLUcode uc;
+      base = curl_url();
+      href = curl_url();
+      if(!base || !href) {
+        curl_mfprintf(stderr, "%u: failed to allocate memory\n", i);
+        fails++;
+        goto zoneid_loop_end;
+      }
+      uc = curl_url_set(base, CURLUPART_URL, tests[i].base, 0);
+      if(!uc)
+        uc = curl_url_set(href, CURLUPART_URL, tests[i].href, 0);
+      if(uc) {
+        curl_mfprintf(stderr, "%u: failed to parse %s / %s -> %d\n",
+                      i, tests[i].base, tests[i].href, (int)uc);
+        fails++;
+        goto zoneid_loop_end;
+      }
+
+      match = Curl_url_same_origin(base, href);
+      if(match != tests[i].expect_match) {
+        curl_mfprintf(stderr, "ERROR: %u base %s and href %s %s\n",
+                      i, tests[i].base, tests[i].href,
+                      match ? "matched" : "did not match");
+        fails++;
+      }
+
+zoneid_loop_end:
+      curl_url_cleanup(base);
+      curl_url_cleanup(href);
+    }
+    abort_if(fails, "same_origin zoneid tests failed");
+  }
 #endif /* !CURL_DISABLE_HTTP */
 
   /* Test parse_hostname_login */
