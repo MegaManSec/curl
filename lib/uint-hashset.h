@@ -73,9 +73,10 @@ CURLcode Curl_u8_strset_setx(struct u8_strset *set,
 /* Set string for id, takes ownership of `str` even on failure. */
 CURLcode Curl_u8_strset_setn(struct u8_strset *set,
                              uint8_t id, char *str);
+/* Remove the string if in the set and zero its memory */
 void Curl_u8_strset_unset(struct u8_strset *set, uint8_t id);
 
-/* Remove the string if in the set and zero its memory */
+/* Alias of Curl_u8_strset_unset() */
 void Curl_u8_strset_unset0(struct u8_strset *set, uint8_t id);
 
 CURLcode Curl_u8_strset_copy(struct u8_strset *dest, struct u8_strset *src);

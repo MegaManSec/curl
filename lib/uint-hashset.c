@@ -95,8 +95,10 @@ void Curl_u8_strset_clear(struct u8_strset *set)
 {
   uint16_t i;
   DEBUGASSERT(set->init == CURL_U8_STRSET_MAGIC);
-  for(i = 0; i < CURL_U8_SET_SLOT_CNT(set); ++i)
+  for(i = 0; i < CURL_U8_SET_SLOT_CNT(set); ++i) {
+    curlx_strzero(set->data[i]);
     curlx_safefree(set->data[i]);
+  }
 
   if(set->data != set->sdata)
     curlx_safefree(set->data);
@@ -226,6 +228,7 @@ CURLcode Curl_u8_strset_setn(struct u8_strset *set,
 
   if(u8_strset_get_index(set, id, &i)) {
     /* `id` is in set, replace value */
+    curlx_strzero(set->data[i]);
     curlx_free(set->data[i]);
     set->data[i] = str;
     return CURLE_OK;
@@ -266,15 +269,14 @@ UNITTEST CURLcode u8_strset_set(struct u8_strset *set,
   return Curl_u8_strset_setx(set, id, str, str ? strlen(str) : 0);
 }
 
-static void u8_strset_unset(struct u8_strset *set, uint8_t id, bool zero)
+static void u8_strset_unset(struct u8_strset *set, uint8_t id)
 {
   uint8_t i, j;
 
   DEBUGASSERT(set->init == CURL_U8_STRSET_MAGIC);
   if(u8_strset_get_index(set, id, &i)) {
     /* `id` is in set */
-    if(zero)
-      curlx_strzero(set->data[i]);
+    curlx_strzero(set->data[i]);
     curlx_safefree(set->data[i]);
     set->ids[i] = set->psl[i] = 0;
     --set->count;
@@ -294,12 +296,12 @@ static void u8_strset_unset(struct u8_strset *set, uint8_t id, bool zero)
 
 void Curl_u8_strset_unset(struct u8_strset *set, uint8_t id)
 {
-  u8_strset_unset(set, id, FALSE);
+  u8_strset_unset(set, id);
 }
 
 void Curl_u8_strset_unset0(struct u8_strset *set, uint8_t id)
 {
-  u8_strset_unset(set, id, TRUE);
+  u8_strset_unset(set, id);
 }
 
 CURLcode Curl_u8_strset_copy(struct u8_strset *dest, struct u8_strset *src)
