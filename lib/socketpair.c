@@ -27,8 +27,75 @@
 #include "urldata.h"
 #include "rand.h"
 #include "curlx/nonblock.h"
+#include "select.h"   /* for Curl_poll */
 
 #ifndef CURL_DISABLE_SOCKETPAIR
+
+#if defined(UNITTESTS) || \
+  (!defined(USE_EVENTFD) && !defined(HAVE_PIPE) && !defined(HAVE_SOCKETPAIR))
+/* Write a random nonce to writefd and read it back from readfd, to verify
+   that the two sockets are connected to each other and not to some other
+   local process. Returns 0 on match, -1 on error, timeout or mismatch. */
+/* @unittest 1962 */
+/* @unittest 1963 */
+UNITTEST int verify_nonce(curl_socket_t writefd, curl_socket_t readfd);
+UNITTEST int verify_nonce(curl_socket_t writefd, curl_socket_t readfd)
+{
+  struct curltime start = curlx_now();
+  char rnd[9];
+  char check[sizeof(rnd)];
+  char *p = &check[0];
+  size_t s = sizeof(check);
+  struct pollfd pfd[1];
+
+  if(Curl_rand(NULL, (unsigned char *)rnd, sizeof(rnd)))
+    return -1;
+
+  /* write data to the socket */
+  swrite(writefd, rnd, sizeof(rnd));
+
+  /* verify that we read the correct data */
+  do {
+    ssize_t nread;
+
+    /* Do not block forever */
+    if(curlx_timediff_ms(curlx_now(), start) > (60 * 1000))
+      return -1;
+
+    pfd[0].fd = readfd;
+    pfd[0].events = POLLIN;
+    pfd[0].revents = 0;
+    if(Curl_poll(pfd, 1, 1000) <= 0 || !(pfd[0].revents & POLLIN))
+      continue;
+
+    nread = sread(readfd, p, s);
+    if(!nread)
+      /* the peer closed the connection */
+      return -1;
+    if(nread == -1) {
+      int sockerr = SOCKERRNO;
+      if(SOCK_EAGAIN(sockerr)
+#ifndef USE_WINSOCK
+         || (sockerr == SOCKEINTR) || (sockerr == SOCKEINPROGRESS)
+#endif
+        ) {
+        continue;
+      }
+      return -1;
+    }
+    s -= nread;
+    if(s) {
+      p += nread;
+      continue;
+    }
+    if(memcmp(rnd, check, sizeof(check)))
+      return -1;
+    break;
+  } while(1);
+
+  return 0;
+}
+#endif /* UNITTESTS || (!USE_EVENTFD && !HAVE_PIPE && !HAVE_SOCKETPAIR) */
 
 /* choose implementation */
 #ifdef USE_EVENTFD
@@ -142,8 +209,6 @@ static int wakeup_socketpair(curl_socket_t socks[2], bool nonblocking)
 #define INADDR_LOOPBACK 0x7f000001
 #endif
 
-#include "select.h"   /* for Curl_poll */
-
 static int wakeup_inet(curl_socket_t socks[2], bool nonblocking)
 {
   union {
@@ -205,56 +270,17 @@ static int wakeup_inet(curl_socket_t socks[2], bool nonblocking)
   socks[1] = CURL_ACCEPT(listener, NULL, NULL);
   if(socks[1] == CURL_SOCKET_BAD)
     goto error;
-  else {
-    struct curltime start = curlx_now();
-    char rnd[9];
-    char check[sizeof(rnd)];
-    char *p = &check[0];
-    size_t s = sizeof(check);
 
-    if(Curl_rand(NULL, (unsigned char *)rnd, sizeof(rnd)))
-      goto error;
+  /* non-blocking so a silent peer cannot make verify_nonce() hang */
+  if(curlx_nonblock(socks[0], TRUE) < 0 ||
+     curlx_nonblock(socks[1], TRUE) < 0)
+    goto error;
+  if(verify_nonce(socks[0], socks[1]))
+    goto error;
 
-    /* write data to the socket */
-    swrite(socks[0], rnd, sizeof(rnd));
-    /* verify that we read the correct data */
-    do {
-      ssize_t nread;
-
-      pfd[0].fd = socks[1];
-      pfd[0].events = POLLIN;
-      pfd[0].revents = 0;
-      (void)Curl_poll(pfd, 1, 1000); /* one second */
-
-      nread = sread(socks[1], p, s);
-      if(nread == -1) {
-        int sockerr = SOCKERRNO;
-        /* Do not block forever */
-        if(curlx_timediff_ms(curlx_now(), start) > (60 * 1000))
-          goto error;
-        if(SOCK_EAGAIN(sockerr)
-#ifndef USE_WINSOCK
-           || (sockerr == SOCKEINTR) || (sockerr == SOCKEINPROGRESS)
-#endif
-          ) {
-          continue;
-        }
-        goto error;
-      }
-      s -= nread;
-      if(s) {
-        p += nread;
-        continue;
-      }
-      if(memcmp(rnd, check, sizeof(check)))
-        goto error;
-      break;
-    } while(1);
-  }
-
-  if(nonblocking)
-    if(curlx_nonblock(socks[0], TRUE) < 0 ||
-       curlx_nonblock(socks[1], TRUE) < 0)
+  if(!nonblocking)
+    if(curlx_nonblock(socks[0], FALSE) < 0 ||
+       curlx_nonblock(socks[1], FALSE) < 0)
       goto error;
 #ifdef USE_SO_NOSIGPIPE
   if(Curl_sock_nosigpipe(socks[1]) < 0)
