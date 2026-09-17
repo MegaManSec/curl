@@ -168,6 +168,12 @@ static void tcpnodelay(struct Curl_cfilter *cf,
 #endif
 }
 
+/* Convert seconds to milliseconds, clamped to INT_MAX on overflow. */
+int Curl_keepalive_ms(int secs)
+{
+  return (secs <= (INT_MAX / 1000)) ? (secs * 1000) : INT_MAX;
+}
+
 #if defined(USE_WINSOCK) || defined(TCP_KEEPIDLE) ||               \
   defined(TCP_KEEPALIVE) || defined(TCP_KEEPALIVE_THRESHOLD) ||    \
   defined(TCP_KEEPINTVL) || defined(TCP_KEEPALIVE_ABORT_THRESHOLD)
@@ -177,7 +183,7 @@ static void tcpnodelay(struct Curl_cfilter *cf,
   (defined(_WIN32) && !defined(TCP_KEEPIDLE))
 /* Solaris < 11.4, DragonFlyBSD < 500702 and Windows < 10.0.16299
  * use millisecond units. */
-#define KEEPALIVE_FACTOR(x) ((x) *= 1000)
+#define KEEPALIVE_FACTOR(x) ((x) = Curl_keepalive_ms(x))
 #else
 #define KEEPALIVE_FACTOR(x)
 #endif

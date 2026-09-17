@@ -63,6 +63,9 @@ CURLcode Curl_socket_open(struct Curl_easy *data,
 int Curl_sock_nosigpipe(curl_socket_t sockfd);
 #endif
 
+/* Convert seconds to milliseconds, clamped to INT_MAX on overflow. */
+int Curl_keepalive_ms(int secs);
+
 int Curl_socket_close(struct Curl_easy *data, struct connectdata *conn,
                       curl_socket_t sock);
 

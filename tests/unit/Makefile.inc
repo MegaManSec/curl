@@ -124,11 +124,12 @@ TESTS_C = \
   unit3304.c \
   unit3306.c \
   unit3307.c \
-  unit3312.c \
   unit3308.c \
   unit3309.c \
   unit3310.c \
   unit3311.c \
+  unit3312.c \
+  unit3313.c \
   unit3400.c
   unit3400.c \
   unit4002.c
