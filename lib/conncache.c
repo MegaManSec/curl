@@ -863,6 +863,11 @@ CURLcode Curl_cpool_upkeep(struct Curl_easy *data)
   if(!cpool)
     return CURLE_OK;
 
+  /* do not scan a pool that is already being scanned further up the
+   * call stack, e.g. when a closesocket callback reenters libcurl */
+  if(CPOOL_IS_LOCKED(cpool))
+    return CURLE_OK;
+
   CPOOL_LOCK(cpool, admin);
   while(cpool_foreach(admin, cpool, NULL, conn_upkeep))
     ;
@@ -897,6 +902,12 @@ struct connectdata *Curl_cpool_get_conn(struct Curl_easy *data,
 
   if(!cpool)
     return NULL;
+
+  /* do not scan a pool that is already being scanned further up the
+   * call stack, e.g. when a closesocket callback reenters libcurl */
+  if(CPOOL_IS_LOCKED(cpool))
+    return NULL;
+
   fctx.id = conn_id;
   fctx.conn = NULL;
   CPOOL_LOCK(cpool, data);

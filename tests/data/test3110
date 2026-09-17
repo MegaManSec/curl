@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+conncache
+</keywords>
+</info>
+
+# Client-side
+<client>
+<features>
+unittest
+</features>
+<name>
+cpool upkeep/get_conn reentrant scan guard unit tests
+</name>
+</client>
+</testcase>
