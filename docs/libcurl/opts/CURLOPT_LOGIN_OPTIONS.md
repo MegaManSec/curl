@@ -53,12 +53,16 @@ previous ones. Set it to NULL to disable its use again.
 
 CURLOPT_LOGIN_OPTIONS(3) is a *login property*, it does not change the
 security context. This means that this option changes how the login happens
-when a connection is created, but it does not affect which connections libcurl
-can reuse. libcurl may reuse a connection that was set up with a different
-options string; a different options string does not by itself prevent reuse.
-Connection reuse still depends on other connection properties matching, such
-as the protocol, hostname, port number, credentials and other settings that
-affect the connection.
+when a connection is created, but it does not by itself prevent reuse of a
+connection that was set up with a different options string. Connection reuse
+still depends on other connection properties matching, such as the protocol,
+hostname, port number, credentials and other settings that affect the
+connection.
+
+For SMTP, if the options string restricts the SASL mechanism via "AUTH=",
+libcurl does not reuse a connection that was authenticated using a mechanism
+excluded by that restriction; a new connection is created instead. This
+mechanism check is not currently performed for IMAP or POP3.
 
 # DEFAULT
 
