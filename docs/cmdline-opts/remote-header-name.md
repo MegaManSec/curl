@@ -19,6 +19,10 @@ Example:
 Tell the --remote-name option to use the server-specified Content-Disposition
 filename instead of extracting a filename from the URL. If the server-provided
 filename contains a path, that is stripped off before the filename is used.
+On platforms with a native path syntax other than a plain slash-separated
+one (such as Windows, MS-DOS and OpenVMS), characters that could otherwise
+make the name refer to a different drive, device or directory are also
+removed.
 
 The file is saved in the current directory, or in the directory specified with
 --output-dir.
