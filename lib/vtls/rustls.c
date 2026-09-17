@@ -205,6 +205,7 @@ static CURLcode cr_recv(struct Curl_cfilter *cf, struct Curl_easy *data,
   size_t n = 0;
   rustls_result rresult = 0;
   bool eof = FALSE;
+  int max_empty_reads = 100;
 
   DEBUGASSERT(backend);
   *pnread = 0;
@@ -227,6 +228,8 @@ static CURLcode cr_recv(struct Curl_cfilter *cf, struct Curl_easy *data,
                                      &n);
     if(rresult == RUSTLS_RESULT_PLAINTEXT_EMPTY) {
       backend->data_in_pending = FALSE;
+      if(!max_empty_reads--)
+        break;
     }
     else if(rresult == RUSTLS_RESULT_UNEXPECTED_EOF) {
       failf(data, "rustls: peer closed TCP connection "
