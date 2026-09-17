@@ -65,15 +65,20 @@ static int check_gss_err(struct Curl_easy *data,
                                     GSS_C_NULL_OID,
                                     &msg_ctx, &status_string);
       if(maj_stat == GSS_S_COMPLETE) {
-        if(curlx_dyn_addn(&dbuf, status_string.value, status_string.length))
+        if(curlx_dyn_addn(&dbuf, status_string.value, status_string.length)) {
+          gss_release_buffer(&min_stat, &status_string);
+          curlx_dyn_free(&dbuf);
           return 1; /* error */
+        }
         gss_release_buffer(&min_stat, &status_string);
         break;
       }
       gss_release_buffer(&min_stat, &status_string);
     }
-    if(curlx_dyn_addn(&dbuf, ".\n", 2))
+    if(curlx_dyn_addn(&dbuf, ".\n", 2)) {
+      curlx_dyn_free(&dbuf);
       return 1; /* error */
+    }
     msg_ctx = 0;
     while(!msg_ctx) {
       /* convert minor status code (underlying routine error) to text */
@@ -82,8 +87,11 @@ static int check_gss_err(struct Curl_easy *data,
                                     GSS_C_NULL_OID,
                                     &msg_ctx, &status_string);
       if(maj_stat == GSS_S_COMPLETE) {
-        if(curlx_dyn_addn(&dbuf, status_string.value, status_string.length))
+        if(curlx_dyn_addn(&dbuf, status_string.value, status_string.length)) {
+          gss_release_buffer(&min_stat, &status_string);
+          curlx_dyn_free(&dbuf);
           return 1; /* error */
+        }
         gss_release_buffer(&min_stat, &status_string);
         break;
       }
