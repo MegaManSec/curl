@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+POP3
+SASL
+SASL AUTH PLAIN
+SASL AUTH EXTERNAL
+RFC1734
+RFC4422
+RFC5034
+timeout
+flaky
+timing-dependent
+</keywords>
+</info>
+
+# Server-side
+<reply>
+<servercmd>
+AUTH PLAIN EXTERNAL
+REPLY AUTH +OK Login successful
+</servercmd>
+</reply>
+
+# Client-side
+<client>
+<server>
+pop3
+</server>
+<name>
+POP3 does not reuse a connection when AUTH restriction gets stricter
+</name>
+<command>
+'pop3://user:secret;AUTH=PLAIN@%HOSTIP:%POP3PORT/%TESTNUMBER0001' --sasl-ir -o %LOGDIR/test%TESTNUMBER0001.out -w '%{num_connects}\n' --next 'pop3://user:secret;AUTH=EXTERNAL@%HOSTIP:%POP3PORT/%TESTNUMBER0002' --sasl-ir --max-time %FTPTIME2 -o %LOGDIR/test%TESTNUMBER0002.out -w '%{num_connects}\n'
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+# The second request must not reuse the PLAIN-authenticated connection, so
+# it opens a fresh one, which the test server cannot also service and the
+# request times out instead of silently reusing the first connection.
+<protocol crlf="yes">
+CAPA
+AUTH PLAIN %b64[%00user%00secret]b64%
+RETR %TESTNUMBER0001
+QUIT
+</protocol>
+<stdout>
+1
+1
+</stdout>
+<errorcode>
+28
+</errorcode>
+</verify>
+</testcase>

@@ -25,6 +25,9 @@
  ***************************************************************************/
 #ifndef CURL_DISABLE_POP3
 extern const struct Curl_protocol Curl_protocol_pop3;
+
+bool Curl_pop3_conns_match(struct connectdata *needle,
+                            struct connectdata *conn);
 #endif
 
 #endif /* HEADER_CURL_POP3_H */

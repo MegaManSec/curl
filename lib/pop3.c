@@ -168,14 +168,11 @@ static const struct pop3_cmd pop3cmds[] = {
  *
  * Parse the URL login options.
  */
-static CURLcode pop3_parse_url_options(struct connectdata *conn)
+static CURLcode pop3_parse_url_options(struct connectdata *conn,
+                                       struct pop3_conn *pop3c)
 {
-  struct pop3_conn *pop3c = Curl_conn_meta_get(conn, CURL_META_POP3_CONN);
   CURLcode result = CURLE_OK;
   const char *ptr = conn->options;
-
-  if(!pop3c)
-    return CURLE_FAILED_INIT;
 
   while(!result && ptr && *ptr) {
     const char *key = ptr;
@@ -1448,7 +1445,7 @@ static CURLcode pop3_connect(struct Curl_easy *data, bool *done)
   Curl_pp_init(pp, Curl_pgrs_now(data));
 
   /* Parse the URL options */
-  result = pop3_parse_url_options(conn);
+  result = pop3_parse_url_options(conn, pop3c);
   if(result)
     return result;
 
@@ -1693,6 +1690,31 @@ static CURLcode pop3_setup_connection(struct Curl_easy *data,
     return CURLE_OUT_OF_MEMORY;
 
   return CURLE_OK;
+}
+
+/*
+ * Curl_pop3_conns_match()
+ *
+ * Verify that a candidate connection was authenticated under a mechanism
+ * still allowed by the requested transfer's ";AUTH=" URL option, so that
+ * a stricter SASL mechanism restriction cannot be bypassed by reusing a
+ * connection authenticated under a weaker one.
+ */
+bool Curl_pop3_conns_match(struct connectdata *needle,
+                            struct connectdata *conn)
+{
+  struct pop3_conn *pop3c = Curl_conn_meta_get(conn, CURL_META_POP3_CONN);
+  struct pop3_conn request;
+
+  if(!pop3c || !pop3c->sasl.authused)
+    return TRUE;
+
+  memset(&request, 0, sizeof(request));
+  if(pop3_parse_url_options(needle, &request))
+    return FALSE;
+
+  return !request.sasl.prefmech ||
+         !!(request.sasl.prefmech & pop3c->sasl.authused);
 }
 
 /*

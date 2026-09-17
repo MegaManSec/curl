@@ -880,6 +880,12 @@ static bool url_match_proto_config(struct connectdata *conn,
       return FALSE;
   }
 #endif
+#ifndef CURL_DISABLE_POP3
+  else if(get_protocol_family(m->needle->scheme) & PROTO_FAMILY_POP3) {
+    if(!Curl_pop3_conns_match(m->needle, conn))
+      return FALSE;
+  }
+#endif
   return TRUE;
 }
 
