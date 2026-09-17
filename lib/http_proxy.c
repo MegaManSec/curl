@@ -362,7 +362,7 @@ static CURLcode http_proxy_create_CONNECTUDP(struct httpreq **preq,
 
   /* Setup the proxy-authorization header, if any */
   result = Curl_http_output_auth(data, cf->conn, req->method, HTTPREQ_GET,
-                                 req->authority, NULL, TRUE);
+                                 req->path, NULL, TRUE);
   if(result)
     goto out;
 
