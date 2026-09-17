@@ -1930,6 +1930,7 @@ TESTCASES = \
   test2206 \
   test2207 \
   test2208 \
+  test2209 \
   \
   test2270 \
   test2271 \
