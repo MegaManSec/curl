@@ -1291,8 +1291,14 @@ static int cookie_sort_ct(const void *p1, const void *p2)
 
 bool Curl_secure_context(struct Curl_easy *data, const char *host)
 {
-  return Curl_xfer_is_secure(data) ||
-    curl_strequal("localhost", host) ||
+  if(Curl_xfer_is_secure(data))
+    return TRUE;
+#ifndef CURL_DISABLE_PROXY
+  if(data->conn &&
+     (data->conn->http_proxy.peer || data->conn->socks_proxy.peer))
+    return FALSE;
+#endif
+  return curl_strequal("localhost", host) ||
     !strcmp(host, "127.0.0.1") ||
     !strcmp(host, "::1");
 }
