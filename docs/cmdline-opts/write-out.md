@@ -113,6 +113,10 @@ Header names and values are validated as UTF-8 and any invalid byte sequence
 is replaced with the Unicode replacement character (U+FFFD), so the output is
 always valid JSON even when a server sends non-UTF-8 header content.
 
+A header name or value that exceeds 100000 bytes once JSON-escaped is cut off
+at that length with a trailing `...` added inside the string, so the output
+remains valid JSON.
+
 ## `http_code`
 The numerical response code that was found in the last retrieved HTTP(S) or
 FTP(s) transfer.
