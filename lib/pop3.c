@@ -432,6 +432,7 @@ static CURLcode pop3_perform_capa(struct Curl_easy *data,
   pop3c->sasl.authmechs = SASL_AUTH_NONE; /* No known auth. mechanisms yet */
   pop3c->sasl.authused = SASL_AUTH_NONE;  /* Clear the auth. mechanism used */
   pop3c->tls_supported = FALSE;           /* Clear the TLS capability */
+  pop3c->authtypes &= POP3_TYPE_APOP;     /* Clear CAPA-derived auth types */
 
   /* Send the CAPA command */
   result = Curl_pp_sendf(data, &pop3c->pp, "%s", "CAPA");

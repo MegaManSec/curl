@@ -640,6 +640,8 @@ static CURLcode smtp_perform_ehlo(struct Curl_easy *data,
                                              used for esmtp connections */
   smtpc->tls_supported = FALSE;           /* Clear the TLS capability */
   smtpc->auth_supported = FALSE;          /* Clear the AUTH capability */
+  smtpc->size_supported = FALSE;          /* Clear the SIZE capability */
+  smtpc->utf8_supported = FALSE;          /* Clear the SMTPUTF8 capability */
 
   /* Send the EHLO command */
   result = Curl_pp_sendf(data, &smtpc->pp, "EHLO %s", smtpc->domain);

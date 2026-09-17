@@ -510,6 +510,8 @@ static CURLcode imap_perform_capability(struct Curl_easy *data,
   imapc->sasl.authmechs = SASL_AUTH_NONE; /* No known auth. mechanisms yet */
   imapc->sasl.authused = SASL_AUTH_NONE;  /* Clear the auth. mechanism used */
   imapc->tls_supported = FALSE;           /* Clear the TLS capability */
+  imapc->login_disabled = FALSE;          /* Clear the LOGIN disabled flag */
+  imapc->ir_supported = FALSE;            /* Clear the IR flag */
 
   /* Send the CAPABILITY command */
   result = imap_sendf(data, imapc, "CAPABILITY");
