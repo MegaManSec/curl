@@ -86,10 +86,11 @@ TESTS_C = \
   unit1675.c \
   unit1676.c \
   unit1688.c \
-  unit1729.c \
   unit1689.c \
   unit1690.c \
   unit1694.c \
+  unit1729.c \
+  unit1731.c \
   unit1961.c \
   unit1962.c \
   unit1963.c \
