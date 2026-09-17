@@ -291,6 +291,7 @@ static CURLcode fetch_entry(struct Curl_easy *data,
   char type = CURL_DNSQ_IS_ADDR(dns_queries) ?
               CURL_DNST_ADDR : CURL_DNST_HTTPS;
   CURLcode result = CURLE_OK;
+  bool wildcard_tried = FALSE;
 
   *pdns = NULL;
   if(!dnscache)
@@ -302,30 +303,39 @@ static CURLcode fetch_entry(struct Curl_easy *data,
   /* See if it is already in our dns cache */
   dns = Curl_hash_pick(&dnscache->entries, key.data, key.len);
 
-  /* No entry found in cache, check if we might have a wildcard entry */
-  if(!dns && (type == CURL_DNST_ADDR) && data->state.wildcard_resolve) {
-    struct Curl_str wildname;
+  for(;;) {
+    if(dns && (data->set.dns_cache_timeout_ms != -1)) {
+      /* See whether the returned entry is stale. Done before we release
+         lock */
+      struct dnscache_prune_data user;
 
-    curlx_str_assign(&wildname, "*", 1);
-    dnsc_str2id(&id, CURL_DNST_ADDR, &wildname, peer->port);
-    dnsc_id2key(&key, &id);
+      user.pnow = Curl_pgrs_now(data);
+      user.max_age_ms = data->set.dns_cache_timeout_ms;
+      user.oldest_ms = 0;
 
-    /* See if it is already in our dns cache */
-    dns = Curl_hash_pick(&dnscache->entries, key.data, key.len);
-  }
+      if(dnscache_entry_is_stale(&user, dns)) {
+        infof(data, "Hostname in DNS cache was stale, zapped");
+        dns = NULL; /* the memory deallocation is being handled by the hash */
+        Curl_hash_delete(&dnscache->entries, key.data, key.len);
+      }
+    }
 
-  if(dns && (data->set.dns_cache_timeout_ms != -1)) {
-    /* See whether the returned entry is stale. Done before we release lock */
-    struct dnscache_prune_data user;
+    if(dns || wildcard_tried || (type != CURL_DNST_ADDR) ||
+       !data->state.wildcard_resolve)
+      break;
 
-    user.pnow = Curl_pgrs_now(data);
-    user.max_age_ms = data->set.dns_cache_timeout_ms;
-    user.oldest_ms = 0;
+    /* No usable entry found (or a stale one just got evicted), check if we
+       might have a wildcard entry */
+    wildcard_tried = TRUE;
+    {
+      struct Curl_str wildname;
 
-    if(dnscache_entry_is_stale(&user, dns)) {
-      infof(data, "Hostname in DNS cache was stale, zapped");
-      dns = NULL; /* the memory deallocation is being handled by the hash */
-      Curl_hash_delete(&dnscache->entries, key.data, key.len);
+      curlx_str_assign(&wildname, "*", 1);
+      dnsc_str2id(&id, CURL_DNST_ADDR, &wildname, peer->port);
+      dnsc_id2key(&key, &id);
+
+      /* See if it is already in our dns cache */
+      dns = Curl_hash_pick(&dnscache->entries, key.data, key.len);
     }
   }
 
