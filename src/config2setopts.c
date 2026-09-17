@@ -487,9 +487,8 @@ static CURLcode ssl_setopts(struct OperationConfig *config, CURL *curl)
   my_setopt_SSLVERSION(curl, CURLOPT_SSLVERSION,
                        tlsversion(config->ssl_version,
                                   config->ssl_version_max));
-  if(config->proxy)
-    my_setopt_SSLVERSION(curl, CURLOPT_PROXY_SSLVERSION,
-                         config->proxy_ssl_version);
+  my_setopt_SSLVERSION(curl, CURLOPT_PROXY_SSLVERSION,
+                       config->proxy_ssl_version);
 
   {
     long mask =

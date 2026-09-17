@@ -2176,6 +2176,7 @@ TESTCASES = \
   test3604 \
   test3800 \
   test3901 \
+  test3902 \
   test3910 \
   test3911 \
   test3912 \
@@ -2252,4 +2253,5 @@ EXTRA_DIST = \
   data1706-3.md \
   data1706-4.md \
   data1706-stdout.txt \
+  data3900.c \
   DISABLED
