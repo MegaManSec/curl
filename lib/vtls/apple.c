@@ -205,6 +205,11 @@ CURLcode Curl_vtls_apple_verify(struct Curl_cfilter *cf,
     if(__builtin_available(macOS 10.9, iOS 7, tvOS 9, watchOS 2, *)) {
       CFDataRef ocspdata = CFDataCreate(NULL, ocsp_buf, (CFIndex)ocsp_len);
 
+      if(!ocspdata) {
+        result = CURLE_OUT_OF_MEMORY;
+        goto out;
+      }
+
       status = SecTrustSetOCSPResponse(trust, ocspdata);
       CFRelease(ocspdata);
       if(status != noErr) {
