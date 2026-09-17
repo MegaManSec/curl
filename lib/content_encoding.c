@@ -802,7 +802,9 @@ CURLcode Curl_build_unencoding_stack(struct Curl_easy *data,
         return CURLE_OK;
       }
 
-      if(Curl_cwriter_count(data, phase) >= MAX_ENCODE_STACK) {
+      if(Curl_cwriter_count(data, CURL_CW_TRANSFER_DECODE) +
+         Curl_cwriter_count(data, CURL_CW_CONTENT_DECODE) >=
+         MAX_ENCODE_STACK) {
         failf(data, "Reject response exceeding limit of %d %s encodings",
               MAX_ENCODE_STACK,
               is_transfer ? "transfer" : "content");
