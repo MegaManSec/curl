@@ -185,15 +185,16 @@ CURLMcode Curl_mntfy_dispatch_all(struct Curl_multi *multi)
 
   while(multi->ntfy.head && !multi->ntfy.failure) {
     struct mntfy_chunk *chunk = multi->ntfy.head;
+    struct mntfy_chunk *next = chunk->next;
     /* this may cause new notifications to be added! */
     mntfy_chunk_dispatch_all(multi, chunk);
     DEBUGASSERT(chunk->r_offset == chunk->w_offset);
 
     if(chunk == multi->ntfy.tail) /* last one, keep */
       break;
-    DEBUGASSERT(chunk->next);
+    DEBUGASSERT(next);
     DEBUGASSERT(multi->ntfy.head != multi->ntfy.tail);
-    multi->ntfy.head = chunk->next;
+    multi->ntfy.head = next;
     mnfty_chunk_destroy(chunk);
   }
 
