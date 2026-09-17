@@ -462,6 +462,7 @@ static CURLcode single_header(struct Curl_cfilter *cf,
            cannot keep the connection alive since the close is
            the end signal so we bail out at once instead */
         CURL_TRC_CF(data, cf, "CONNECT: no content-length or chunked");
+        ts->close_connection = TRUE;
         ts->keepon = KEEPON_DONE;
       }
     }
