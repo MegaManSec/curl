@@ -1730,6 +1730,7 @@ TESTCASES = \
   test1723 \
   test1724 \
   test1725 \
+  test1727 \
   test1740 \
   test1741 \
   test1791 \

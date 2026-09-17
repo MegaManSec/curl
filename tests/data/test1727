@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+TFTP
+TFTP WRQ
+CURLOPT_READFUNCTION
+CURL_READFUNC_PAUSE
+</keywords>
+</info>
+
+# Client-side
+<client>
+<server>
+tftp
+</server>
+<tool>
+lib%TESTNUMBER
+</tool>
+
+<name>
+TFTP upload paused and resumed mid-block sends the full payload
+</name>
+<command>
+tftp://%HOSTIP:%TFTPPORT//%TESTNUMBER
+</command>
+</client>
+
+# Verify pseudo protocol after the test has been "shot"
+<verify>
+<upload nonewline="yes">
+0123456789ABCDEFGHIJ
+</upload>
+<protocol>
+opcode = 2
+mode = octet
+filename = /%TESTNUMBER
+</protocol>
+</verify>
+</testcase>
