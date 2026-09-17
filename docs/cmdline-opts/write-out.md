@@ -109,6 +109,10 @@ The header names provided in lowercase, listed in order of appearance over the
 wire. Except for duplicated headers. They are grouped on the first occurrence
 of that header, each value is presented in the JSON array.
 
+Header names and values are validated as UTF-8 and any invalid byte sequence
+is replaced with the Unicode replacement character (U+FFFD), so the output is
+always valid JSON even when a server sends non-UTF-8 header content.
+
 ## `http_code`
 The numerical response code that was found in the last retrieved HTTP(S) or
 FTP(s) transfer.

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP GET
+header_json
+</keywords>
+</info>
+
+# Server-side
+<reply>
+<data nocheck="yes">
+HTTP/1.1 200 OK
+Date: Tue, 09 Nov 2010 14:49:00 GMT
+Content-Type: text/html
+Content-Length: 6
+X-Bad-Utf8: bad%hex[%c3]hex%value
+X-Good-Utf8: caf%hex[%c3%a9]hex%
+X-Lone-Continuation: x%hex[%80]hex%y
+Connection: close
+
+-foo-
+</data>
+</reply>
+
+# Client-side
+<client>
+<features>
+headers-api
+</features>
+<server>
+http
+</server>
+<name>
+-w header JSON output with invalid UTF-8 header values
+</name>
+<command option="no-output">
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER -w '%{header_json}\n' -o %LOGDIR/%TESTNUMBER.out
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<protocol crlf="headers">
+GET /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+
+</protocol>
+<stdout mode="text">
+{"date":["Tue, 09 Nov 2010 14:49:00 GMT"],
+"content-type":["text/html"],
+"content-length":["6"],
+"x-bad-utf8":["bad%hex[%ef%bf%bd]hex%value"],
+"x-good-utf8":["caf%hex[%c3%a9]hex%"],
+"x-lone-continuation":["x%hex[%ef%bf%bd]hex%y"],
+"connection":["close"]
+}
+</stdout>
+</verify>
+</testcase>
