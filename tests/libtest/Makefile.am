@@ -47,6 +47,7 @@ EXTRA_DIST = CMakeLists.txt $(FIRST_C) $(FIRST_H) $(UTILS_C) $(UTILS_H) $(TESTS_
   mk-lib1521.pl \
   test1013.pl \
   test1022.pl \
+  test1727.pl \
   test307.pl \
   test610.pl \
   test613.pl \

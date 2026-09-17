@@ -33,6 +33,9 @@
 /* The maximum line length for an encoded session ticket */
 #define MAX_SSLS_LINE (64 * 1024)
 
+/* how many "<filename>.<N>.tmp" names to try before giving up */
+#define MAX_SSLS_TEMP_ATTEMPTS 100
+
 static CURLcode tool_ssls_easy(struct OperationConfig *config,
                                CURLSH *share, CURL **peasy)
 {
@@ -184,16 +187,66 @@ out:
   return result;
 }
 
+/* Opens a temp file named "<filename>.<N>.tmp" for writing, next to
+   'filename'. The caller renames it over 'filename' once written. */
+static CURLcode tool_ssls_fopen(const char *filename, FILE **fh,
+                                char **tempname)
+{
+  struct dynbuf tmp;
+  int fd = -1;
+  int i;
+  size_t tmplen;
+  CURLcode result = CURLE_WRITE_ERROR;
+
+  *fh = NULL;
+  *tempname = NULL;
+  curlx_dyn_init(&tmp, MAX_SSLS_LINE);
+
+  for(i = 0; i < MAX_SSLS_TEMP_ATTEMPTS; i++) {
+    curlx_dyn_reset(&tmp);
+    if(curlx_dyn_addf(&tmp, "%s.%d.tmp", filename, i)) {
+      result = CURLE_OUT_OF_MEMORY;
+      goto fail;
+    }
+#ifdef _WIN32
+    fd = curlx_open(curlx_dyn_ptr(&tmp), _O_WRONLY | _O_CREAT | _O_EXCL,
+                    _S_IREAD | _S_IWRITE);
+#else
+    fd = curlx_open(curlx_dyn_ptr(&tmp), O_WRONLY | O_CREAT | O_EXCL,
+                    S_IRUSR | S_IWUSR);
+#endif
+    if(fd != -1 || errno != EEXIST)
+      break;
+  }
+  if(fd == -1)
+    goto fail;
+
+  *fh = curlx_fdopen(fd, FOPEN_WRITETEXT);
+  if(!*fh) {
+    curlx_close(fd);
+    unlink(curlx_dyn_ptr(&tmp));
+    goto fail;
+  }
+
+  *tempname = curlx_dyn_take(&tmp, &tmplen);
+  return CURLE_OK;
+
+fail:
+  curlx_dyn_free(&tmp);
+  return result;
+}
+
 CURLcode tool_ssls_save(struct OperationConfig *config,
                         CURLSH *share, const char *filename)
 {
   struct tool_ssls_ctx ctx;
   CURL *easy = NULL;
-  CURLcode result = CURLE_OK;
+  CURLcode result;
+  char *tempname = NULL;
 
   ctx.exported = 0;
-  ctx.fp = curlx_fopen(filename, FOPEN_WRITETEXT);
-  if(!ctx.fp) {
+  result = tool_ssls_fopen(filename, &ctx.fp, &tempname);
+  if(result) {
     warnf("Warning: Failed to create SSL session file %s", filename);
     goto out;
   }
@@ -209,5 +262,12 @@ out:
     curl_easy_cleanup(easy);
   if(ctx.fp)
     curlx_fclose(ctx.fp);
+  if(tempname) {
+    if(!result && curlx_rename(tempname, filename))
+      result = CURLE_WRITE_ERROR;
+    if(result)
+      unlink(tempname);
+    curlx_free(tempname);
+  }
   return result;
 }
