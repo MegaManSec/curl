@@ -1500,9 +1500,12 @@ static CURLcode telnet_do(struct Curl_easy *data, bool *done)
       }
 
       snread = 0;
-      if(poll_cnt == 2) {
-        if(pfd[1].revents & POLLIN) { /* read from in file */
-          snread = read(pfd[1].fd, buffer, sizeof(buffer));
+      if(!data->set.is_fread_set) {
+        if(poll_cnt == 2 && pfd[1].revents) {
+          if(pfd[1].revents & POLLIN) /* read from in file */
+            snread = read(pfd[1].fd, buffer, sizeof(buffer));
+          if(!snread) /* EOF/HUP/ERR on input: stop polling it */
+            poll_cnt = 1;
         }
       }
       else {
