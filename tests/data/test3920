@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP CONNECT
+HTTP proxy
+proxytunnel
+header line folding
+</keywords>
+</info>
+
+# Server-side
+<reply>
+<data nocheck="yes">
+HTTP/1.1 200 OK
+Content-Length: 0
+
+</data>
+<connect nocheck="yes">
+HTTP/1.1 200 OK%CR
+X-Folded: v%CR
+%repeat[310000 x %20]%b%CR
+%CR
+</connect>
+</reply>
+
+# Client-side
+<client>
+<server>
+http
+http-proxy
+</server>
+<features>
+proxy
+</features>
+<name>
+Reject CONNECT-tunnel response folded over a huge whitespace run
+</name>
+<command>
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER -p -x http://%HOSTIP:%PROXYPORT
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+56
+</errorcode>
+</verify>
+</testcase>
