@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+RTSP
+CRLF
+</keywords>
+</info>
+
+# Client-side
+<client>
+<tool>
+lib%TESTNUMBER
+</tool>
+
+<name>
+CURLOPT_RTSP_STREAM_URI/SESSION_ID/TRANSPORT reject CRLF
+</name>
+
+<command>
+-
+</command>
+</client>
+
+<verify>
+<stdout mode="text">
+ok
+</stdout>
+</verify>
+</testcase>
