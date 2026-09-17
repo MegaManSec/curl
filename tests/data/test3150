@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+memory callbacks
+curl_getenv
+</keywords>
+</info>
+
+# Client-side
+<client>
+<tool>
+lib%TESTNUMBER
+</tool>
+
+<name>
+curl_global_init(_mem)() reject swap with outstanding getenv()
+</name>
+</client>
+
+</testcase>

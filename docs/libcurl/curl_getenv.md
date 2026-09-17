@@ -5,6 +5,8 @@ Title: curl_getenv
 Section: 3
 Source: libcurl
 See-also:
+  - curl_free (3)
+  - curl_global_init_mem (3)
   - getenv (3C)
 Protocol:
   - All
@@ -31,6 +33,11 @@ systems libcurl builds on (including Windows).
 
 You must curl_free(3) the returned string when you are done with it and,
 although not constrained by its type, it may not be altered.
+
+curl_getenv(3) is usable before curl_global_init(3) (or
+curl_global_init_mem(3)) is called. Once it has returned a non-NULL string,
+a later curl_global_init_mem(3) call fails rather than replace the memory
+functions used to allocate that string.
 
 # %PROTOCOLS%
 

@@ -5,6 +5,7 @@ Title: curl_global_init_mem
 Section: 3
 Source: libcurl
 See-also:
+  - curl_getenv (3)
   - curl_global_cleanup (3)
   - curl_global_init (3)
 Protocol:
@@ -66,6 +67,12 @@ To replace calloc()
 This function is otherwise the same as curl_global_init(3), please refer
 to that man page for documentation.
 
+Call this function before any other libcurl function, including
+curl_getenv(3). If curl_getenv(3) already returned memory allocated with the
+default (replaced) functions, this function fails and the previous memory
+functions stay in effect, so that memory already handed out remains safe to
+release with curl_free(3).
+
 # CAUTION
 
 Manipulating these gives considerable powers to the application to severely
@@ -109,3 +116,6 @@ CURLE_OK (0) means everything was OK, non-zero means an error occurred, see
 libcurl-errors(3). If CURLOPT_ERRORBUFFER(3) was set with curl_easy_setopt(3)
 there can be an error message stored in the error buffer when non-zero is
 returned.
+
+CURLE_FAILED_INIT is returned when curl_getenv(3) already handed out memory
+allocated with the default functions.

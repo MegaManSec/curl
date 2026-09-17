@@ -2085,6 +2085,7 @@ TESTCASES = \
   test3108 \
   test3109 \
   test3110 \
+  test3150 \
   test3200 \
   test3201 \
   test3202 \

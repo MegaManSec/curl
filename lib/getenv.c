@@ -57,13 +57,21 @@ char *curl_getenv(const char *variable)
     }
 
     /* if rc < bufsize then rc is bytes written not including null */
-    if(rc < bufsize)
+    if(rc < bufsize) {
+      Curl_memfuncs_used = TRUE;
       return buf;
+    }
 
     /* else rc is bytes needed, try again */
   }
 #else
   char *env = getenv(variable);
-  return (env && env[0]) ? curlx_strdup(env) : NULL;
+  if(env && env[0]) {
+    char *dup = curlx_strdup(env);
+    if(dup)
+      Curl_memfuncs_used = TRUE;
+    return dup;
+  }
+  return NULL;
 #endif
 }
