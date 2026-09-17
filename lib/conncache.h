@@ -25,6 +25,7 @@
  *
  ***************************************************************************/
 #include "curlx/timeval.h"
+#include "hash.h"
 
 struct connectdata;
 struct Curl_easy;

@@ -184,10 +184,10 @@ static void cpool_discard_conn(struct cpool *cpool,
 
   admin = Curl_get_admin(data);
   /*
-   * If this connection is not marked to force-close, leave it open if there
-   * are other users of it
+   * Never discard a connection that other transfers still use, no
+   * matter if this is an aborted close or not
    */
-  if(CONN_INUSE(conn) && !aborted) {
+  if(CONN_INUSE(conn)) {
     CURL_TRC_M(admin, "[CPOOL] not discarding #%" FMT_OFF_T
                " still in use by %u transfers", conn->connection_id,
                conn->attached_xfers);
@@ -226,6 +226,21 @@ static void cpool_discard_conn(struct cpool *cpool,
     Curl_cshutdn_add(&multi->cshutdn, multi, conn, max_shutdowns);
   }
 }
+
+#ifdef UNITTESTS
+/* @unittest 1688 */
+UNITTEST void cpool_unit_discard_conn(struct cpool *cpool,
+                                       struct Curl_easy *data,
+                                       struct connectdata *conn,
+                                       bool aborted);
+UNITTEST void cpool_unit_discard_conn(struct cpool *cpool,
+                                       struct Curl_easy *data,
+                                       struct connectdata *conn,
+                                       bool aborted)
+{
+  cpool_discard_conn(cpool, data, conn, aborted);
+}
+#endif
 
 void Curl_cpool_destroy(struct cpool *cpool, struct Curl_easy *admin)
 {
@@ -384,9 +399,9 @@ static void cpool_conn_close(struct cpool *cpool,
   if(!cpool)
     return;
 
-  /* If this connection is not marked to force-close, leave it open if there
-   * are other users of it */
-  if(CONN_INUSE(conn) && !aborted) {
+  /* Never close a connection that other transfers still use, no matter
+   * if this is an aborted close or not */
+  if(CONN_INUSE(conn)) {
     DEBUGASSERT(0); /* does this ever happen? */
     DEBUGF(infof(data, "conn terminate when inuse: %u", conn->attached_xfers));
     return;
