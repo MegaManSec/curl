@@ -37,6 +37,7 @@
 #include "curlx/strparse.h"
 #include "rand.h"
 #include "escape.h"
+#include "strcase.h"
 
 #ifndef USE_WINDOWS_SSPI
 #define SESSION_ALGO 1 /* for algos with this bit set */
@@ -338,6 +339,9 @@ bool Curl_auth_is_digest_supported(void)
  * passwdp [in]     - The user's password.
  * service [in]     - The service type such as http, smtp, pop or imap.
  * out     [out]    - The result storage.
+ * rspauth [out]    - The expected server rspauth, for use with
+ *                    Curl_auth_verify_digest_md5_message() (33 bytes: 32
+ *                    hex digits and a NUL terminator).
  *
  * Returns CURLE_OK on success.
  */
@@ -345,7 +349,8 @@ CURLcode Curl_auth_create_digest_md5_message(struct Curl_easy *data,
                                              const struct bufref *chlg,
                                              struct Curl_creds *creds,
                                              const char *default_service,
-                                             struct bufref *out)
+                                             struct bufref *out,
+                                             char *rspauth)
 {
   const char *service = Curl_creds_has_sasl_service(creds) ?
     Curl_creds_sasl_service(creds) : default_service;
@@ -357,6 +362,7 @@ CURLcode Curl_auth_create_digest_md5_message(struct Curl_easy *data,
   unsigned char digest[MD5_DIGEST_LEN];
   char HA1_hex[(2 * MD5_DIGEST_LEN) + 1];
   char HA2_hex[(2 * MD5_DIGEST_LEN) + 1];
+  char HA2_srv_hex[(2 * MD5_DIGEST_LEN) + 1];
   char resp_hash_hex[(2 * MD5_DIGEST_LEN) + 1];
   char nonce[64];
   char realm[128];
@@ -484,6 +490,51 @@ CURLcode Curl_auth_create_digest_md5_message(struct Curl_easy *data,
   for(i = 0; i < MD5_DIGEST_LEN; i++)
     curl_msnprintf(&resp_hash_hex[2 * i], 3, "%02x", digest[i]);
 
+  /* Calculate H(A2) for the server's rspauth. Per RFC2831 section 2.1.3,
+     this omits the "AUTHENTICATE:" method used by the client's own A2 */
+  ctxt = Curl_MD5_init(&Curl_DIGEST_MD5);
+  if(!ctxt) {
+    curlx_free(spn);
+
+    return CURLE_OUT_OF_MEMORY;
+  }
+
+  Curl_MD5_update(ctxt, (const unsigned char *)":", 1);
+  Curl_MD5_update(ctxt, (const unsigned char *)spn,
+                  curlx_uztoui(strlen(spn)));
+  Curl_MD5_final(ctxt, digest);
+
+  for(i = 0; i < MD5_DIGEST_LEN; i++)
+    curl_msnprintf(&HA2_srv_hex[2 * i], 3, "%02x", digest[i]);
+
+  ctxt = Curl_MD5_init(&Curl_DIGEST_MD5);
+  if(!ctxt) {
+    curlx_free(spn);
+
+    return CURLE_OUT_OF_MEMORY;
+  }
+
+  Curl_MD5_update(ctxt, (const unsigned char *)HA1_hex, 2 * MD5_DIGEST_LEN);
+  Curl_MD5_update(ctxt, (const unsigned char *)":", 1);
+  Curl_MD5_update(ctxt, (const unsigned char *)nonce,
+                  curlx_uztoui(strlen(nonce)));
+  Curl_MD5_update(ctxt, (const unsigned char *)":", 1);
+  Curl_MD5_update(ctxt, (const unsigned char *)nonceCount,
+                  curlx_uztoui(strlen(nonceCount)));
+  Curl_MD5_update(ctxt, (const unsigned char *)":", 1);
+  Curl_MD5_update(ctxt, (const unsigned char *)cnonce,
+                  curlx_uztoui(strlen(cnonce)));
+  Curl_MD5_update(ctxt, (const unsigned char *)":", 1);
+  Curl_MD5_update(ctxt, (const unsigned char *)qop,
+                  curlx_uztoui(strlen(qop)));
+  Curl_MD5_update(ctxt, (const unsigned char *)":", 1);
+  Curl_MD5_update(ctxt, (const unsigned char *)HA2_srv_hex,
+                  2 * MD5_DIGEST_LEN);
+  Curl_MD5_final(ctxt, digest);
+
+  for(i = 0; i < MD5_DIGEST_LEN; i++)
+    curl_msnprintf(&rspauth[2 * i], 3, "%02x", digest[i]);
+
   /* escape double quotes and backslashes in the username, realm and nonce as
      necessary */
   qrealm = auth_digest_string_quoted(realm);
@@ -507,6 +558,39 @@ CURLcode Curl_auth_create_digest_md5_message(struct Curl_easy *data,
   /* Return the response. */
   Curl_bufref_set(out, response, strlen(response), curl_free);
   return result;
+}
+
+/*
+ * Curl_auth_verify_digest_md5_message()
+ *
+ * This is used to verify the server's rspauth in its final DIGEST-MD5
+ * challenge, per the mutual authentication requirement of RFC2831 section
+ * 2.1.3.
+ *
+ * Parameters:
+ *
+ * chlg    [in]     - The final challenge message from the server.
+ * rspauth [in]     - The expected rspauth, computed by
+ *                    Curl_auth_create_digest_md5_message().
+ *
+ * Returns CURLE_OK on success.
+ */
+CURLcode Curl_auth_verify_digest_md5_message(const struct bufref *chlg,
+                                             const char *rspauth)
+{
+  char buf[(2 * MD5_DIGEST_LEN) + 1];
+  const char *chlgstr = (const char *)Curl_bufref_ptr(chlg);
+
+  if(!chlgstr || !Curl_bufref_len(chlg))
+    return CURLE_BAD_CONTENT_ENCODING;
+
+  if(!auth_digest_get_key_value(chlgstr, "rspauth", buf, sizeof(buf)))
+    return CURLE_BAD_CONTENT_ENCODING;
+
+  if(Curl_timestrcmp(buf, rspauth))
+    return CURLE_BAD_CONTENT_ENCODING;
+
+  return CURLE_OK;
 }
 
 /*

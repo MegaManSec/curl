@@ -99,7 +99,13 @@ CURLcode Curl_auth_create_digest_md5_message(struct Curl_easy *data,
                                              const struct bufref *chlg,
                                              struct Curl_creds *creds,
                                              const char *default_service,
-                                             struct bufref *out);
+                                             struct bufref *out,
+                                             char *rspauth);
+
+/* This is used to verify the server's rspauth in a DIGEST-MD5 final
+   challenge, as computed by Curl_auth_create_digest_md5_message() */
+CURLcode Curl_auth_verify_digest_md5_message(const struct bufref *chlg,
+                                             const char *rspauth);
 
 /* This is used to decode an HTTP DIGEST challenge message */
 CURLcode Curl_auth_decode_digest_http_message(const char *chlg,

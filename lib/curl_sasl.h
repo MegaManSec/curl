@@ -125,6 +125,9 @@ struct SASL {
   BIT(resetprefs);           /* For URL auth option parsing. */
   BIT(mutual_auth);          /* Mutual authentication enabled (GSSAPI only) */
   BIT(force_ir);             /* Protocol always supports initial response */
+#ifndef CURL_DISABLE_DIGEST_AUTH
+  char digestmd5_rspauth[33]; /* Expected DIGEST-MD5 server rspauth */
+#endif
 };
 
 /* This is used to test whether the line starts with the given mechanism */

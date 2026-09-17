@@ -5,6 +5,7 @@
 IMAP
 SASL
 SASL AUTH DIGEST-MD5
+SASL CANCELLATION
 RFC2831
 </keywords>
 </info>
@@ -13,19 +14,11 @@ RFC2831
 <reply>
 <servercmd>
 AUTH DIGEST-MD5
+CAPA LOGINDISABLED
 REPLY AUTHENTICATE + %b64[realm="curl",nonce="5300d17a1d695bd411e4cdf96f9548c23ced6175",algorithm=md5-sess,qop="auth"]b64%
-REPLY %b64[username="user",realm="curl",nonce="5300d17a1d695bd411e4cdf96f9548c23ced6175",cnonce="34333231353332313633323137333231",nc="00000001",digest-uri="imap/127.0.0.1",response=be638249362d7aa0e35385076751ab48,qop=auth]b64% + %b64[rspauth=3d290a72ed5b6be7aa78be94ee86f6d5]b64%
-REPLY  A002 OK AUTHENTICATE completed
+REPLY %b64[username="user",realm="curl",nonce="5300d17a1d695bd411e4cdf96f9548c23ced6175",cnonce="34333231353332313633323137333231",nc="00000001",digest-uri="imap/127.0.0.1",response=be638249362d7aa0e35385076751ab48,qop=auth]b64% + %b64[rspauth=deadbeefdeadbeefdeadbeefdeadbeef]b64%
+REPLY * A002 NO AUTH exchange cancelled by client
 </servercmd>
-<data crlf="yes">
-From: me@somewhere
-To: fake@nowhere
-
-body
-
---
-  yours sincerely
-</data>
 </reply>
 
 # Client-side
@@ -43,7 +36,7 @@ digest
 CURL_ENTROPY=12345678
 </setenv>
 <name>
-IMAP DIGEST-MD5 authentication
+IMAP DIGEST-MD5 authentication rejects wrong server rspauth
 </name>
 <command>
 'imap://%HOSTIP:%IMAPPORT/%TESTNUMBER/;MAILINDEX=1' -u user:secret
@@ -52,14 +45,15 @@ IMAP DIGEST-MD5 authentication
 
 # Verify data after the test has been "shot"
 <verify>
+# 67 - CURLE_LOGIN_DENIED
+<errorcode>
+67
+</errorcode>
 <protocol crlf="yes">
 A001 CAPABILITY
 A002 AUTHENTICATE DIGEST-MD5
 %b64[username="user",realm="curl",nonce="5300d17a1d695bd411e4cdf96f9548c23ced6175",cnonce="34333231353332313633323137333231",nc="00000001",digest-uri="imap/127.0.0.1",response=be638249362d7aa0e35385076751ab48,qop=auth]b64%
-
-A003 SELECT %TESTNUMBER
-A004 FETCH 1 BODY[]
-A005 LOGOUT
+*
 </protocol>
 </verify>
 </testcase>

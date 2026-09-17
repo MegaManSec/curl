@@ -649,12 +649,18 @@ CURLcode Curl_sasl_continue(struct SASL *sasl, struct Curl_easy *data,
       result = Curl_auth_create_digest_md5_message(data, &serverdata,
                                                    conn->creds,
                                                    sasl->params->service,
-                                                   &resp);
+                                                   &resp,
+                                                   sasl->digestmd5_rspauth);
     if(!result && (sasl->params->flags & SASL_FLAG_BASE64))
       newstate = SASL_DIGESTMD5_RESP;
     break;
   case SASL_DIGESTMD5_RESP:
-    /* Keep response NULL to output an empty line. */
+    /* Verify the server knows our shared secret before we consider it
+       authenticated. Keep response NULL to output an empty line. */
+    result = get_server_message(sasl, data, &serverdata);
+    if(!result)
+      result = Curl_auth_verify_digest_md5_message(&serverdata,
+                                                    sasl->digestmd5_rspauth);
     break;
 #endif
 
