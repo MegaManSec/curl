@@ -138,8 +138,8 @@ contents of the file and passes them as data and sets the content-type if the
 given file match one of the internally known file extensions. For
 **CURLFORM_FILE** the user may send one or more files in one part by
 providing multiple **CURLFORM_FILE** arguments each followed by the filename
-(and each *CURLFORM_FILE* is allowed to have a
-*CURLFORM_CONTENTTYPE*).
+(and each *CURLFORM_FILE* is allowed to have its own
+*CURLFORM_CONTENTTYPE* and *CURLFORM_FILENAME*).
 
 The given upload file has to exist in its full in the file system already when
 the upload starts, as libcurl needs to read the correct file size beforehand.
