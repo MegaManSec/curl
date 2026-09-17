@@ -151,7 +151,7 @@ static CURLcode peer_create(struct peer_parse *pp,
     if(!peer->scopeid) {
       const char *p = peer->zoneid;
       curl_off_t scope;
-      if(!curlx_str_number(&p, &scope, UINT_MAX)) {
+      if(!curlx_str_number(&p, &scope, UINT_MAX) && !*p) {
         /* A plain number, use it directly as a scope id. */
         peer->scopeid = (uint32_t)scope;
       }
