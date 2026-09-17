@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+TLS
+threads
+SSLKEYLOGFILE
+</keywords>
+</info>
+
+# Client-side
+<client>
+<features>
+unittest
+SSL
+</features>
+<name>
+SSLKEYLOGFILE keylog open/close/write thread-safety
+</name>
+<command>
+%LOGDIR/keylog%TESTNUMBER
+</command>
+</client>
+</testcase>

@@ -29,14 +29,25 @@
 
 #include "escape.h"
 #include "curlx/win32-fopen.h"
+#include "easy_lock.h"
 
 /* The fp for the open SSLKEYLOGFILE, or NULL if not open */
 static FILE *keylog_file_fp;
 /* Used for verbose logging */
 static char *keylog_file_name;
 
+#ifdef GLOBAL_INIT_IS_THREADSAFE
+static curl_simple_lock keylog_s_lock = CURL_SIMPLE_LOCK_INIT;
+#define keylog_lock()   curl_simple_lock_lock(&keylog_s_lock)
+#define keylog_unlock() curl_simple_lock_unlock(&keylog_s_lock)
+#else
+#define keylog_lock()
+#define keylog_unlock()
+#endif
+
 void Curl_tls_keylog_open(void)
 {
+  keylog_lock();
   if(!keylog_file_fp) {
     keylog_file_name = getenv("SSLKEYLOGFILE");
     if(keylog_file_name) {
@@ -54,19 +65,26 @@ void Curl_tls_keylog_open(void)
       }
     }
   }
+  keylog_unlock();
 }
 
 void Curl_tls_keylog_close(void)
 {
+  keylog_lock();
   if(keylog_file_fp) {
     curlx_fclose(keylog_file_fp);
     keylog_file_fp = NULL;
   }
+  keylog_unlock();
 }
 
 bool Curl_tls_keylog_enabled(void)
 {
-  return !!keylog_file_fp;
+  bool enabled;
+  keylog_lock();
+  enabled = !!keylog_file_fp;
+  keylog_unlock();
+  return enabled;
 }
 
 const char *Curl_tls_keylog_file_name(void)
@@ -80,7 +98,7 @@ bool Curl_tls_keylog_write_line(const char *line)
   size_t linelen;
   char buf[256];
 
-  if(!keylog_file_fp || !line) {
+  if(!line) {
     return FALSE;
   }
 
@@ -96,9 +114,15 @@ bool Curl_tls_keylog_write_line(const char *line)
   }
   buf[linelen] = '\0';
 
+  keylog_lock();
+  if(!keylog_file_fp) {
+    keylog_unlock();
+    return FALSE;
+  }
   /* Using fputs here instead of fprintf since libcurl's fprintf replacement
      may not be thread-safe. */
   fputs(buf, keylog_file_fp);
+  keylog_unlock();
   return TRUE;
 }
 
@@ -113,8 +137,6 @@ bool Curl_tls_keylog_write(const char *label,
                      (2 * SECRET_MAXLEN) + 1 + 1];
   DEBUGASSERT(random_size >= CLIENT_RANDOM_SIZE);
   if(random_size < CLIENT_RANDOM_SIZE)
-    return FALSE;
-  if(!keylog_file_fp)
     return FALSE;
 
   pos = strlen(label);
@@ -141,9 +163,15 @@ bool Curl_tls_keylog_write(const char *label,
   line[pos++] = '\n';
   line[pos] = '\0';
 
+  keylog_lock();
+  if(!keylog_file_fp) {
+    keylog_unlock();
+    return FALSE;
+  }
   /* Using fputs here instead of fprintf since libcurl's fprintf replacement
      may not be thread-safe. */
   fputs((char *)line, keylog_file_fp);
+  keylog_unlock();
   return TRUE;
 }
 
