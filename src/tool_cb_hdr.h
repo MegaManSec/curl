@@ -47,6 +47,7 @@ struct HdrCbData {
   struct OutStruct *etag_save;
   struct curl_slist *headlist;
   bool honor_cd_filename;
+  bool etag_seen_status;
 };
 
 int tool_write_headers(struct HdrCbData *hdrcbdata, FILE *stream);

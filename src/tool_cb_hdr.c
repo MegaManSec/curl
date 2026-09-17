@@ -258,6 +258,47 @@ fail:
 }
 
 /*
+ * Check that a response ETag value is a valid RFC 7232 entity-tag: an
+ * optional weak indicator (W/) followed by a double-quoted opaque string.
+ */
+static bool valid_etag(const char *etag, size_t len)
+{
+  size_t i;
+
+  if((len >= 2) && (etag[0] == 'W') && (etag[1] == '/')) {
+    etag += 2;
+    len -= 2;
+  }
+  if((len < 2) || (etag[0] != '"') || (etag[len - 1] != '"'))
+    return FALSE;
+  for(i = 1; i < len - 1; i++) {
+    unsigned char c = (unsigned char)etag[i];
+    if((c < 0x21) || (c == '"') || (c == 0x7f))
+      return FALSE;
+  }
+  return TRUE;
+}
+
+/*
+ * Discard a previously saved etag when a new response starts, so a value
+ * written for an earlier, non-final response cannot survive in the saved
+ * file if the final response carries no ETag of its own.
+ */
+static size_t clear_etag(struct OutStruct *etag_save)
+{
+  curlx_struct_stat file;
+  int fd = fileno(etag_save->stream);
+
+  if((fd != -1) &&
+     etag_save->regular_file &&
+     !curlx_fstat(fd, &file) &&
+     (S_ISREG(file.st_mode) &&
+      toolx_ftruncate(fd, 0)))
+    return CURL_WRITEFUNC_ERROR;
+  return 0;
+}
+
+/*
  * Write etag to file when --etag-save option is given.
  */
 static size_t save_etag(const char *etag_h, const char *endp,
@@ -270,7 +311,7 @@ static size_t save_etag(const char *etag_h, const char *endp,
     while(ISSPACE(*eot))
       eot--;
 
-    if(eot >= etag_h) {
+    if((eot >= etag_h) && valid_etag(etag_h, eot - etag_h + 1)) {
       size_t etag_length = eot - etag_h + 1;
       curlx_struct_stat file;
       int fd = fileno(etag_save->stream);
@@ -473,6 +514,15 @@ size_t tool_header_cb(char *ptr, size_t size, size_t nmemb, void *userdata)
   if((scheme == proto_http || scheme == proto_https)) {
     long response = 0;
     curl_easy_getinfo(per->curl, CURLINFO_RESPONSE_CODE, &response);
+
+    if(per->config->etag_save_file && etag_save->stream &&
+       (cb >= 5) && checkprefix("HTTP/", str)) {
+      /* a new status line means a new response (CONNECT tunnel, redirect
+         hop or the final one); drop what an earlier one may have saved */
+      if(hdrcbdata->etag_seen_status && clear_etag(etag_save))
+        return CURL_WRITEFUNC_ERROR;
+      hdrcbdata->etag_seen_status = TRUE;
+    }
 
     if((response / 100 != 2) && (response / 100 != 3))
       /* only care about etag and content-disposition headers in 2xx and 3xx

@@ -19,7 +19,9 @@ Example:
 Save an HTTP ETag to the specified file. An ETag is a caching related header,
 usually returned in a response. Use this option with a single URL only.
 
-If no ETag is sent by the server, an empty file is created.
+Only the ETag of the final response is saved. If that response carries no
+ETag, an empty file is created, even if an earlier redirect response along
+the way had one.
 
 In many situations you want to use an existing etag in the request to avoid
 downloading the same resource again but also save the new etag if it has
