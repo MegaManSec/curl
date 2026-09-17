@@ -93,9 +93,12 @@ static struct altsvc *altsvc_createid(const char *srchost,
                                       enum alpnid srcalpnid,
                                       enum alpnid dstalpnid,
                                       size_t srcport,
-                                      size_t dstport)
+                                      size_t dstport,
+                                      const char *srczoneid,
+                                      uint32_t srcscopeid)
 {
   struct altsvc *as;
+  size_t zlen = srczoneid ? strlen(srczoneid) : 0;
   if((hlen > 2) && srchost[0] == '[') {
     /* IPv6 address, strip off brackets */
     srchost++;
@@ -113,8 +116,9 @@ static struct altsvc *altsvc_createid(const char *srchost,
   if(!hlen || !dlen)
     /* bad input */
     return NULL;
-  /* struct size plus both strings */
-  as = curlx_calloc(1, sizeof(struct altsvc) + (hlen + 1) + (dlen + 1));
+  /* struct size plus both strings and the source zone id, if any */
+  as = curlx_calloc(1, sizeof(struct altsvc) + (hlen + 1) + (dlen + 1) +
+                    (zlen ? zlen + 1 : 0));
   if(!as)
     return NULL;
   as->src.host = (char *)as + sizeof(struct altsvc);
@@ -124,6 +128,12 @@ static struct altsvc *altsvc_createid(const char *srchost,
   as->dst.host = (char *)as + sizeof(struct altsvc) + hlen + 1;
   memcpy(as->dst.host, dsthost, dlen);
   /* the null-terminator is already there */
+
+  if(zlen) {
+    as->src.zoneid = (char *)as + sizeof(struct altsvc) + hlen + 1 + dlen + 1;
+    memcpy(as->src.zoneid, srczoneid, zlen);
+  }
+  as->src.scopeid = srcscopeid;
 
   as->src.alpnid = srcalpnid;
   as->dst.alpnid = dstalpnid;
@@ -147,7 +157,7 @@ static struct altsvc *altsvc_create(struct Curl_str *srchost,
   return altsvc_createid(curlx_str(srchost), curlx_strlen(srchost),
                          curlx_str(dsthost), curlx_strlen(dsthost),
                          srcalpnid, dstalpnid,
-                         srcport, dstport);
+                         srcport, dstport, NULL, 0);
 }
 
 /* append the new entry to the list after possibly removing an old entry
@@ -279,7 +289,13 @@ static CURLcode altsvc_out(struct altsvc *as, FILE *fp)
   const char *dst6_post = "";
   const char *src6_pre = "";
   const char *src6_post = "";
-  CURLcode result = curlx_gmtime(as->expires, &stamp);
+  CURLcode result;
+
+  if(as->src.zoneid)
+    /* the zone id is not part of the persisted format, skip it */
+    return CURLE_OK;
+
+  result = curlx_gmtime(as->expires, &stamp);
   if(result)
     return result;
 #ifdef USE_IPV6
@@ -451,6 +467,16 @@ static bool hostcompare(const char *host, const char *check)
   return curl_strnequal(host, check, hlen);
 }
 
+/* altsvc_zonematch() returns true if 'origin' and the source host of a
+ * cached entry belong to the same IPv6 zone/scope, including the common
+ * case where neither one has any.
+ */
+static bool altsvc_zonematch(struct Curl_peer *origin, struct althost *host)
+{
+  return (origin->scopeid == host->scopeid) &&
+         (origin->scopeid || curl_strequal(origin->zoneid, host->zoneid));
+}
+
 /* altsvc_flush() removes all alternatives for this source origin from the
    list. ALPN_none matches any ALPN. */
 static void altsvc_flush(struct altsvcinfo *asi,
@@ -464,6 +490,7 @@ static void altsvc_flush(struct altsvcinfo *asi,
     n = Curl_node_next(e);
     if((!origin_alpnid || (origin_alpnid == as->src.alpnid)) &&
        (origin->port == as->src.port) &&
+       altsvc_zonematch(origin, &as->src) &&
        hostcompare(origin->hostname, as->src.host)) {
       Curl_node_remove(e);
       altsvc_free(as);
@@ -648,7 +675,8 @@ CURLcode Curl_altsvc_parse(struct Curl_easy *data,
                            curlx_str(&dsthost),
                            curlx_strlen(&dsthost),
                            origin_alpnid, dstalpnid,
-                           origin->port, dstport);
+                           origin->port, dstport,
+                           origin->zoneid, origin->scopeid);
       if(as) {
         time_t secs = time(NULL);
         /* The expires time also needs to take the Age: value (if any)
@@ -707,6 +735,7 @@ bool Curl_altsvc_lookup(struct altsvcinfo *asi,
       if((origin_alpnid == as->src.alpnid) &&
          (versions & (int)as->dst.alpnid) &&
          (origin->port == as->src.port) &&
+         altsvc_zonematch(origin, &as->src) &&
          hostcompare(origin->hostname, as->src.host)) {
         /* match */
         *dstentry = as;

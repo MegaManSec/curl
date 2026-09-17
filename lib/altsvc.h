@@ -37,6 +37,8 @@ struct althost {
   char *host;
   uint16_t port;
   enum alpnid alpnid;
+  char *zoneid; /* NULL or the source origin's IPv6 zone identifier */
+  uint32_t scopeid; /* IPv6 scope of zoneid, when known */
 };
 
 struct altsvc {

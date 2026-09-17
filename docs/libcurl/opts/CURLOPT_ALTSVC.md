@@ -45,6 +45,13 @@ A response with the `Alt-Svc: clear` header removes all the cached
 alternatives for that origin, regardless of which HTTP version they were
 originally learned over.
 
+An origin that is a scoped/zoned IPv6 link-local address (for example
+`fe80::1%eth0`) is cached and looked up per zone, so an alternative learned
+for that address on one zone is never used for a request to the same address
+on a different zone. Such entries are not written to the cache file, since
+the zone identifier is local to the machine and interface configuration that
+learned it.
+
 # SECURITY CONCERNS
 
 libcurl cannot fully protect against attacks where an attacker has write

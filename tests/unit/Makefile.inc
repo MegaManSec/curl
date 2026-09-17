@@ -69,6 +69,7 @@ TESTS_C = \
   unit1652.c \
   unit1653.c \
   unit1654.c \
+  unit1718.c \
   unit1655.c \
   unit1656.c \
   unit1657.c \
