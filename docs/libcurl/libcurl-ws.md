@@ -47,6 +47,17 @@ WebSocket" request header field. When the upgrade is accepted by the server,
 it responds with a 101 Switching and then the client can speak WebSocket with
 the server. The communication can happen in both directions at the same time.
 
+# HANDSHAKE
+
+As part of the upgrade, the client sends a `Sec-WebSocket-Key` request header
+with a random value and the server must respond with a matching
+`Sec-WebSocket-Accept` response header, computed from that value as described
+in RFC 6455 section 4.1. libcurl verifies this response header and fails the
+transfer with `CURLE_WEIRD_SERVER_REPLY` if it is missing or does not match
+the expected value, and does the same if the response carries a
+`Sec-WebSocket-Extensions` or `Sec-WebSocket-Protocol` header the client never
+offered.
+
 # EXTENSIONS
 
 The WebSocket protocol allows the client to request and negotiate *extensions*

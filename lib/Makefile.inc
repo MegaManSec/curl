@@ -203,6 +203,7 @@ LIB_CFILES =         \
   curl_ntlm_core.c   \
   curl_range.c       \
   curl_sasl.c        \
+  curl_sha1.c        \
   curl_sha512_256.c  \
   curl_share.c       \
   curl_sspi.c        \
@@ -338,6 +339,7 @@ LIB_HFILES =         \
   curl_range.h       \
   curl_sasl.h        \
   curl_setup.h       \
+  curl_sha1.h        \
   curl_sha256.h      \
   curl_sha512_256.h  \
   curl_share.h       \

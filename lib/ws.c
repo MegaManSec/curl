@@ -42,6 +42,8 @@
 #include "select.h"
 #include "curlx/strparse.h"
 #include "curlx/strcopy.h"
+#include "http.h"
+#include "curl_sha1.h"
 
 /* RFC 6455 Section 5.2
 
@@ -1353,6 +1355,10 @@ CURLcode Curl_ws_request(struct Curl_easy *data, struct dynbuf *req)
   }
   curlx_strcopy(keyval, sizeof(keyval), randstr, randlen);
   curlx_free(randstr);
+  /* keep the key around, to verify the Sec-WebSocket-Accept response
+     against it once it arrives */
+  curlx_strcopy(k->ws_key, sizeof(k->ws_key), keyval, randlen);
+  k->ws_accept_seen = FALSE;
   for(i = 0; !result && (i < CURL_ARRAYSIZE(heads)); i++) {
     if(!Curl_checkheaders(data, heads[i].name, strlen(heads[i].name))) {
       result = curlx_dyn_addf(req, "%s: %s\r\n", heads[i].name, heads[i].val);
@@ -1362,6 +1368,75 @@ CURLcode Curl_ws_request(struct Curl_easy *data, struct dynbuf *req)
   k->upgr101 = UPGR101_WS;
   data->conn->bits.upgrade_in_progress = TRUE;
   return result;
+}
+
+/* RFC 6455 Section 4.1: the Sec-WebSocket-Accept response header value MUST
+   be the base64 encoding of the SHA-1 hash of the request's
+   Sec-WebSocket-Key value concatenated with this GUID. */
+#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+static CURLcode ws_verify_accept(struct Curl_easy *data, const char *value)
+{
+  struct SingleRequest *k = &data->req;
+  unsigned char sha[CURL_SHA1_DIGEST_LENGTH];
+  char accept_input[sizeof(k->ws_key) + sizeof(WS_GUID) - 1];
+  char *expect;
+  size_t expectlen;
+  CURLcode result;
+  size_t inlen = strlen(k->ws_key);
+
+  curl_msnprintf(accept_input, sizeof(accept_input), "%s%s",
+                k->ws_key, WS_GUID);
+  result = Curl_sha1it(sha, (const unsigned char *)accept_input,
+                       inlen + strlen(WS_GUID));
+  if(result)
+    return result;
+  result = curlx_base64_encode(sha, sizeof(sha), &expect, &expectlen);
+  if(result)
+    return result;
+  if(strcmp(value, expect)) {
+    failf(data, "[WS] Sec-WebSocket-Accept mismatch");
+    result = CURLE_WEIRD_SERVER_REPLY;
+  }
+  else
+    k->ws_accept_seen = TRUE;
+  curlx_free(expect);
+  return result;
+}
+
+/*
+ * Curl_ws_hdr() is called for every response header while a WebSocket
+ * upgrade is in progress, to verify the RFC 6455 handshake response.
+ */
+CURLcode Curl_ws_hdr(struct Curl_easy *data, const char *hd, size_t hdlen)
+{
+#define WS_HD_IS(n) \
+  (((hdlen) >= (sizeof(n) - 1)) && curl_strnequal((n), hd, sizeof(n) - 1))
+
+  if(data->req.upgr101 != UPGR101_WS)
+    return CURLE_OK;
+
+  if(WS_HD_IS("Sec-WebSocket-Accept:")) {
+    CURLcode result;
+    char *value = Curl_copy_header_value(hd);
+    if(!value)
+      return CURLE_OUT_OF_MEMORY;
+    result = ws_verify_accept(data, value);
+    curlx_free(value);
+    return result;
+  }
+  else if(WS_HD_IS("Sec-WebSocket-Extensions:") &&
+          !Curl_checkheaders(data, STRCONST("Sec-WebSocket-Extensions"))) {
+    failf(data, "[WS] unsolicited Sec-WebSocket-Extensions in response");
+    return CURLE_WEIRD_SERVER_REPLY;
+  }
+  else if(WS_HD_IS("Sec-WebSocket-Protocol:") &&
+          !Curl_checkheaders(data, STRCONST("Sec-WebSocket-Protocol"))) {
+    failf(data, "[WS] unsolicited Sec-WebSocket-Protocol in response");
+    return CURLE_WEIRD_SERVER_REPLY;
+  }
+  return CURLE_OK;
+#undef WS_HD_IS
 }
 
 static void ws_conn_dtor(const void *key, size_t klen, void *entry)
@@ -1421,23 +1496,13 @@ CURLcode Curl_ws_accept(struct Curl_easy *data,
     ws_dec_reset(&ws->dec);
     ws_enc_reset(&ws->enc);
   }
-  /* Verify the Sec-WebSocket-Accept response.
-
-     The sent value is the base64 encoded version of a SHA-1 hash done on the
-     |Sec-WebSocket-Key| header field concatenated with
-     the string "258EAFA5-E914-47DA-95CA-C5AB0DC85B11". */
-
-  /* If the response includes a |Sec-WebSocket-Extensions| header field and
-     this header field indicates the use of an extension that was not present
-     in the client's handshake (the server has indicated an extension not
-     requested by the client), the client MUST Fail the WebSocket Connection.
-   */
-
-  /* If the response includes a |Sec-WebSocket-Protocol| header field
-     and this header field indicates the use of a subprotocol that was
-     not present in the client's handshake (the server has indicated a
-     subprotocol not requested by the client), the client MUST Fail
-     the WebSocket Connection. */
+  /* Curl_ws_hdr() already verified the Sec-WebSocket-Accept, Extensions and
+     Protocol response headers while they were parsed; only a missing
+     Sec-WebSocket-Accept remains to be caught here. */
+  if(!k->ws_accept_seen) {
+    failf(data, "[WS] missing Sec-WebSocket-Accept header");
+    return CURLE_WEIRD_SERVER_REPLY;
+  }
 
   infof(data, "[WS] Received 101, switch to WebSocket");
 

@@ -68,6 +68,14 @@ HTTP server - the transfer returns `CURLE_HTTP_RETURNED_ERROR` for that
 transfer. Note then that even 2xx response codes are then considered error
 since it failed to provide a WebSocket transfer.
 
+libcurl also verifies the 101 response per RFC 6455 before considering the
+upgrade successful: it computes the expected `Sec-WebSocket-Accept` value
+from the `Sec-WebSocket-Key` it sent and fails the transfer with
+`CURLE_WEIRD_SERVER_REPLY` if the response header is missing or does not
+match, and it fails the transfer the same way if the response carries a
+`Sec-WebSocket-Extensions` or `Sec-WebSocket-Protocol` header the client
+never offered.
+
 ## Test suite
 
 I looked for an existing small WebSocket server implementation with maximum
@@ -98,8 +106,6 @@ Ideas:
 
 ## Future work
 
-- Verify the Sec-WebSocket-Accept response. It requires a sha-1 function.
-- Verify Sec-WebSocket-Extensions and Sec-WebSocket-Protocol in the response
 - Consider a `curl_ws_poll()`
 - Make sure WebSocket code paths are fuzzed
 - Add client-side PING interval

@@ -3602,7 +3602,7 @@ static CURLcode http_header_s(struct Curl_easy *data,
   }
 #endif
 
-  return CURLE_OK;
+  return Curl_ws_hdr(data, hd, hdlen);
 }
 
 /*
