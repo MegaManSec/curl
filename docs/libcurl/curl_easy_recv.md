@@ -104,3 +104,5 @@ Reading exactly 0 bytes indicates a closed connection.
 
 If there is no socket available to use from the previous transfer, this
 function returns **CURLE_UNSUPPORTED_PROTOCOL**.
+
+If **n** is NULL, this function returns **CURLE_BAD_FUNCTION_ARGUMENT**.
