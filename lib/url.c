@@ -886,6 +886,12 @@ static bool url_match_proto_config(struct connectdata *conn,
       return FALSE;
   }
 #endif
+#ifndef CURL_DISABLE_IMAP
+  else if(get_protocol_family(m->needle->scheme) & PROTO_FAMILY_IMAP) {
+    if(!Curl_imap_conns_match(m->needle, conn))
+      return FALSE;
+  }
+#endif
   return TRUE;
 }
 

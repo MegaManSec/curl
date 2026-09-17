@@ -59,10 +59,10 @@ still depends on other connection properties matching, such as the protocol,
 hostname, port number, credentials and other settings that affect the
 connection.
 
-For SMTP, if the options string restricts the SASL mechanism via "AUTH=",
-libcurl does not reuse a connection that was authenticated using a mechanism
-excluded by that restriction; a new connection is created instead. This
-mechanism check is not currently performed for IMAP or POP3.
+For IMAP, POP3 and SMTP, if the options string restricts the SASL mechanism
+via "AUTH=", libcurl does not reuse a connection that was authenticated
+using a mechanism excluded by that restriction; a new connection is created
+instead.
 
 # DEFAULT
 

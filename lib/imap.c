@@ -2307,6 +2307,31 @@ static CURLcode imap_setup_connection(struct Curl_easy *data,
 }
 
 /*
+ * Curl_imap_conns_match()
+ *
+ * Verify that a candidate connection was authenticated under a mechanism
+ * still allowed by the requested transfer's ";AUTH=" URL option, so that
+ * a stricter SASL mechanism restriction cannot be bypassed by reusing a
+ * connection authenticated under a weaker one.
+ */
+bool Curl_imap_conns_match(struct connectdata *needle,
+                           struct connectdata *conn)
+{
+  struct imap_conn *imapc = Curl_conn_meta_get(conn, CURL_META_IMAP_CONN);
+  struct imap_conn request;
+
+  if(!imapc || !imapc->sasl.authused)
+    return TRUE;
+
+  memset(&request, 0, sizeof(request));
+  if(imap_parse_url_options(needle, &request))
+    return FALSE;
+
+  return !request.sasl.prefmech ||
+         !!(request.sasl.prefmech & imapc->sasl.authused);
+}
+
+/*
  * IMAP protocol.
  */
 const struct Curl_protocol Curl_protocol_imap = {
