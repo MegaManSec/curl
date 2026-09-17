@@ -805,6 +805,10 @@ static CURLcode tftp_send_first(struct tftp_conn *state,
     break;
 
   case TFTP_EVENT_DATA: /* Connected for receive */
+    if(data->state.upload) {
+      failf(data, "%s", "Unexpected DATA packet during upload");
+      return CURLE_TFTP_ILLEGAL;
+    }
     result = tftp_connect_for_rx(state, event);
     break;
 
@@ -1105,6 +1109,10 @@ static CURLcode tftp_receive_packet(struct Curl_easy *data,
 
     switch(state->event) {
     case TFTP_EVENT_DATA:
+      if(data->state.upload) {
+        failf(data, "%s", "Unexpected DATA packet during upload");
+        return CURLE_TFTP_ILLEGAL;
+      }
       /* Do not pass to the client empty or retransmitted packets */
       if(state->rbytes > 4 &&
          (NEXT_BLOCKNUM(state->block) == getrpacketblock(&state->rpacket))) {
