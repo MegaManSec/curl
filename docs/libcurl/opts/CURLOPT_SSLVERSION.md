@@ -72,6 +72,11 @@ TLSv1.2 or later
 
 TLSv1.3 or later
 
+With the Schannel backend, requesting TLSv1.3 as the minimum version fails
+with CURLE_SSL_CONNECT_ERROR on Windows versions older than Windows Server
+2022 / Windows 11 (before build 20348), since Schannel does not support
+TLSv1.3 on those systems.
+
 ##
 
 The maximum TLS version can be set by using *one* of the CURL_SSLVERSION_MAX_
