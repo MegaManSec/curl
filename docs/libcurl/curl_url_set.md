@@ -135,6 +135,9 @@ A numeric IPv4 address (in dotted decimal or a legacy form such as a single
 decimal, octal or hexadecimal number) is normalized to dotted decimal, the
 same way it is when libcurl parses a full URL.
 
+If setting the host fails, the zone id from a previously set bracketed IPv6
+address is left untouched, along with the rest of the URL.
+
 ## CURLUPART_ZONEID
 
 If the hostname is a numeric IPv6 address, this field can also be set.

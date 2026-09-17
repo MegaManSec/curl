@@ -432,6 +432,72 @@ zoneid_loop_end:
   }
 #endif /* !CURL_DISABLE_HTTP */
 
+  /* Test that a rejected CURLUPART_HOST update leaves the previous host
+     and zone id untouched */
+#ifndef CURL_DISABLE_HTTP
+  {
+    CURLU *u;
+    CURLUcode uc;
+    char *host_before = NULL;
+    char *zoneid_before = NULL;
+    char *host_after = NULL;
+    char *zoneid_after = NULL;
+    int fails = 0;
+
+    u = curl_url();
+    if(!u)
+      return CURLE_OUT_OF_MEMORY;
+
+    uc = curl_url_set(u, CURLUPART_URL, "https://[fe80::1%25safezone]/", 0);
+    if(uc) {
+      curl_mfprintf(stderr, "failed to parse base URL -> %d\n", (int)uc);
+      fails++;
+      goto host_rollback_end;
+    }
+
+    if(curl_url_get(u, CURLUPART_HOST, &host_before, 0) ||
+       curl_url_get(u, CURLUPART_ZONEID, &zoneid_before, 0)) {
+      curl_mfprintf(stderr, "failed to fetch host/zoneid before update\n");
+      fails++;
+      goto host_rollback_end;
+    }
+
+    /* malformed address body (two '::' compressions), valid zone id */
+    uc = curl_url_set(u, CURLUPART_HOST, "[1::2::3%25attacker]", 0);
+    if(!uc) {
+      curl_mfprintf(stderr, "setting malformed host unexpectedly succeeded\n");
+      fails++;
+      goto host_rollback_end;
+    }
+
+    if(curl_url_get(u, CURLUPART_HOST, &host_after, 0) ||
+       curl_url_get(u, CURLUPART_ZONEID, &zoneid_after, 0)) {
+      curl_mfprintf(stderr, "failed to fetch host/zoneid after update\n");
+      fails++;
+      goto host_rollback_end;
+    }
+
+    if(strcmp(host_before, host_after)) {
+      curl_mfprintf(stderr, "host changed after rejected update:"
+                    " '%s' -> '%s'\n", host_before, host_after);
+      fails++;
+    }
+    if(strcmp(zoneid_before, zoneid_after)) {
+      curl_mfprintf(stderr, "zoneid changed after rejected update:"
+                    " '%s' -> '%s'\n", zoneid_before, zoneid_after);
+      fails++;
+    }
+
+host_rollback_end:
+    curl_free(host_before);
+    curl_free(zoneid_before);
+    curl_free(host_after);
+    curl_free(zoneid_after);
+    curl_url_cleanup(u);
+    abort_if(fails, "CURLUPART_HOST rollback tests failed");
+  }
+#endif /* !CURL_DISABLE_HTTP */
+
   /* Test parse_hostname_login */
   {
     struct Curl_URL u;

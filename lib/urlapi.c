@@ -455,7 +455,8 @@ static const bool invalid_host_char[256] = {
 };
 
 /* This function assumes 'hostname' now starts with [. It trims 'hostname' in
- * place and it sets u->zoneid if present.
+ * place and it sets u->zoneid if present, once the address itself has also
+ * validated successfully.
  *
  * @unittest 1675
  */
@@ -465,6 +466,8 @@ UNITTEST CURLUcode ipv6_parse(struct Curl_URL *u, char *hostname,
                               size_t hlen) /* length of hostname */
 {
   size_t len;
+  char zoneid[MAX_ZONEID_LEN];
+  bool havezone = FALSE;
   DEBUGASSERT(*hostname == '[');
   if(hlen < 4) /* '[::]' is the shortest possible valid string */
     return CURLUE_BAD_IPV6;
@@ -478,7 +481,6 @@ UNITTEST CURLUcode ipv6_parse(struct Curl_URL *u, char *hostname,
     hlen = len;
     if(hostname[len] == '%') {
       /* this could now be '%[zone id]' */
-      char zoneid[MAX_ZONEID_LEN];
       int i = 0;
       char *h = &hostname[len + 1];
       /* pass '25' if present and is a URL encoded percent sign */
@@ -490,9 +492,7 @@ UNITTEST CURLUcode ipv6_parse(struct Curl_URL *u, char *hostname,
       if(!i || (']' != *h))
         return CURLUE_BAD_IPV6;
       zoneid[i] = 0;
-      u->zoneid = curlx_strdup(zoneid);
-      if(!u->zoneid)
-        return CURLUE_OUT_OF_MEMORY;
+      havezone = TRUE;
       hostname[len] = ']'; /* insert end bracket */
       hostname[len + 1] = 0; /* terminate the hostname */
     }
@@ -512,6 +512,13 @@ UNITTEST CURLUcode ipv6_parse(struct Curl_URL *u, char *hostname,
       hostname[hlen + 1] = 0;
     }
     hostname[hlen] = ']'; /* restore ending bracket */
+  }
+
+  /* only commit the zone id once the address itself has validated too */
+  if(havezone) {
+    u->zoneid = curlx_strdup(zoneid);
+    if(!u->zoneid)
+      return CURLUE_OUT_OF_MEMORY;
   }
   return CURLUE_OK;
 }
@@ -2085,6 +2092,7 @@ CURLUcode curl_url_set(CURLU *u, CURLUPart what,
                        const char *part, unsigned int flags)
 {
   char **storep = NULL;
+  char *oldzoneid = NULL;
   bool urlencode = (flags & CURLU_URLENCODE) ? 1 : 0;
   bool plusencode = FALSE;
   bool pathmode = FALSE;
@@ -2124,7 +2132,8 @@ CURLUcode curl_url_set(CURLU *u, CURLUPart what,
     break;
   case CURLUPART_HOST:
     storep = &u->host;
-    curlx_safefree(u->zoneid);
+    oldzoneid = u->zoneid;
+    u->zoneid = NULL;
     break;
   case CURLUPART_ZONEID:
     storep = &u->zoneid;
@@ -2178,13 +2187,20 @@ CURLUcode curl_url_set(CURLU *u, CURLUPart what,
       else if(what == CURLUPART_HOST)
         status = url_sethost(u, &enc, urlencode, flags);
     }
-    if(status)
+    if(status) {
+      if(what == CURLUPART_HOST) {
+        curlx_free(u->zoneid);
+        u->zoneid = oldzoneid;
+      }
       return status;
+    }
 
     if(what == CURLUPART_PASSWORD)
       curlx_strzero(*storep);
     curlx_free(*storep);
     *storep = (char *)CURL_UNCONST(newp);
+    if(what == CURLUPART_HOST)
+      curlx_free(oldzoneid);
   }
   return CURLUE_OK;
 }
