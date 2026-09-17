@@ -96,6 +96,8 @@ CURLcode Curl_setblobopt(struct curl_blob **blobp,
   /* free the previous storage at `blobp' and replace by a dynamic storage
      copy of blob. If CURL_BLOB_COPY is set, the data is copied. */
 
+  if(*blobp && ((*blobp)->flags & CURL_BLOB_COPY))
+    curlx_memzero((*blobp)->data, (*blobp)->len);
   curlx_safefree(*blobp);
 
   if(blob) {
