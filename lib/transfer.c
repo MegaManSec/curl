@@ -598,6 +598,7 @@ CURLcode Curl_retry_request(struct Curl_easy *data, char **url)
   struct connectdata *conn = data->conn;
   bool retry = FALSE;
   bool refused_stream = data->state.refused_stream;
+  bool safe_http_replay = FALSE;
   *url = NULL;
 
   data->state.refused_stream = FALSE; /* consumed by this call */
@@ -609,17 +610,32 @@ CURLcode Curl_retry_request(struct Curl_easy *data, char **url)
      !(conn->scheme->protocol & (PROTO_FAMILY_HTTP | CURLPROTO_RTSP)))
     return CURLE_OK;
 
+  if(conn->scheme->protocol & PROTO_FAMILY_HTTP) {
+    /* a request that has not put any body bytes on the wire yet cannot
+       have caused a server-side side effect, no matter the method; a
+       request that has, is only safe to blindly replay if the method is
+       idempotent */
+    if(!data->req.writebytecount)
+      safe_http_replay = TRUE;
+#ifndef CURL_DISABLE_HTTP
+    else if(Curl_http_method_is_idempotent(data))
+      safe_http_replay = TRUE;
+#endif
+  }
+
   if(conn->bits.reuse &&
      (data->req.bytecount + data->req.headerbytecount == 0) &&
-     ((!data->req.no_body && !data->req.done) ||
-      (conn->scheme->protocol & PROTO_FAMILY_HTTP))
+     ((!data->req.no_body && !data->req.done) || safe_http_replay)
 #ifndef CURL_DISABLE_RTSP
      && (data->set.rtspreq != RTSPREQ_RECEIVE)
 #endif
     )
     /* We got no data, we attempted to reuse a connection. For HTTP this
-       can be a retry so we try again regardless if we expected a body.
-       For other protocols we only try again only if we expected a body.
+       can be a retry so we try again if we expected a body, or if the
+       method cannot have caused a server-side side effect yet (no
+       request body bytes were sent on this attempt, or the method is
+       idempotent). For other protocols we only try again if we expected
+       a body.
 
        This might happen if the connection was left alive when we were
        done using it before, but that was closed when we wanted to read from

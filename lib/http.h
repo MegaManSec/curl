@@ -88,6 +88,7 @@ void Curl_http_to_fold(struct dynbuf *bf);
 
 void Curl_http_method(struct Curl_easy *data,
                       const char **method, Curl_HttpReq *reqp);
+bool Curl_http_method_is_idempotent(struct Curl_easy *data);
 
 /* protocol-specific functions set up to be called by the main engine */
 CURLcode Curl_http_setup_conn(struct Curl_easy *data,

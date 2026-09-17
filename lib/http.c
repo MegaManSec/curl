@@ -2023,6 +2023,17 @@ void Curl_http_method(struct Curl_easy *data,
   *reqp = httpreq;
 }
 
+bool Curl_http_method_is_idempotent(struct Curl_easy *data)
+{
+  const char *method;
+  Curl_HttpReq httpreq;
+
+  Curl_http_method(data, &method, &httpreq);
+  return !strcmp(method, "GET") || !strcmp(method, "HEAD") ||
+    !strcmp(method, "PUT") || !strcmp(method, "DELETE") ||
+    !strcmp(method, "OPTIONS") || !strcmp(method, "TRACE");
+}
+
 static CURLcode http_set_aptr_host(struct Curl_easy *data)
 {
   struct connectdata *conn = data->conn;
