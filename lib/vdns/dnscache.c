@@ -56,7 +56,7 @@
 #include "curlx/strcopy.h"
 #include "curlx/strparse.h"
 
-#define MAX_HOSTCACHE_LEN (255 + 3) /* max FQDN + type + port */
+#define MAX_HOSTCACHE_LEN (255 + 3 + 4) /* max FQDN + type + port + rid */
 #define DNSC_KEY_HASHLEN 8 /* trailer bytes for a truncated name's hash */
 
 #define MAX_DNS_CACHE_SIZE 29999
@@ -65,22 +65,81 @@ struct dnsc_id {
   struct Curl_str name;
   uint16_t port;
   char type;
+  uint32_t rid; /* resolver identity, 0 means unscoped/default resolver */
 };
 
+#if !defined(CURL_DISABLE_DOH) || defined(USE_ARES)
+/* FNV-1a, folding one more string into a running hash. */
+static uint32_t dnsc_hash_str(uint32_t hash, const char *str)
+{
+  while(*str) {
+    hash ^= (uint8_t)*str++;
+    hash *= 16777619u;
+  }
+  return hash;
+}
+
+/*
+ * dnsc_resolver_id() returns a non-zero identifier for the resolver
+ * configuration (DoH URL plus verify bits, and/or CURLOPT_DNS_SERVERS) this
+ * handle is set up to use, or 0 when none of that is configured. This keeps
+ * the DNS cache from handing a name resolved under one handle's resolver
+ * configuration to a handle configured differently, when they share a DNS
+ * cache via a multi handle or CURLSHOPT_SHARE.
+ */
+static uint32_t dnsc_resolver_id(struct Curl_easy *data)
+{
+  uint32_t hash = 2166136261u;
+  bool have_input = FALSE;
+
+#ifndef CURL_DISABLE_DOH
+  if(data->set.doh) {
+    const char *url = CURL_EASY_STR(data, STRING_DOH);
+    if(url) {
+      hash = dnsc_hash_str(hash, url);
+      /* the verify settings are folded in too, since an unverified
+         resolver's answer is not interchangeable with a verified one. */
+      hash ^= (uint32_t)data->set.doh_verifypeer;
+      hash ^= (uint32_t)data->set.doh_verifyhost << 1;
+      hash ^= (uint32_t)data->set.doh_verifystatus << 2;
+      have_input = TRUE;
+    }
+  }
+#endif
+#ifdef USE_ARES
+  {
+    const char *servers = CURL_EASY_STR(data, STRING_DNS_SERVERS);
+    if(servers) {
+      hash = dnsc_hash_str(hash, servers);
+      have_input = TRUE;
+    }
+  }
+#endif
+
+  if(!have_input)
+    return 0;
+  return hash ? hash : 1;
+}
+#else
+#define dnsc_resolver_id(data) ((void)(data), (uint32_t)0)
+#endif
+
 static void dnsc_peer2id(struct dnsc_id *pid, char type,
-                         struct Curl_peer *peer)
+                         struct Curl_easy *data, struct Curl_peer *peer)
 {
   curlx_str_assign(&pid->name, peer->hostname, strlen(peer->hostname));
   pid->port = peer->port;
   pid->type = type;
+  pid->rid = dnsc_resolver_id(data);
 }
 
 static void dnsc_str2id(struct dnsc_id *pid, char type,
-                        struct Curl_str *name, uint16_t port)
+                        struct Curl_str *name, uint16_t port, uint32_t rid)
 {
   pid->name = *name;
   pid->port = port;
   pid->type = type;
+  pid->rid = rid;
 }
 
 struct dnsc_key {
@@ -112,12 +171,19 @@ static uint64_t dnsc_name_hash(struct Curl_str *name)
  */
 static void dnsc_id2key(struct dnsc_key *key, struct dnsc_id *id)
 {
-  size_t avail = sizeof(key->data) - 3;
+  size_t hdrlen = id->rid ? 7 : 3;
+  size_t avail = sizeof(key->data) - hdrlen;
   size_t namelen = curlx_strlen(&id->name);
 
   key->data[0] = id->type;
   key->data[1] = (uint8_t)((id->port >> 8) & 0xff);
   key->data[2] = (uint8_t)(id->port & 0xff);
+  if(id->rid) {
+    key->data[3] = (uint8_t)((id->rid >> 24) & 0xff);
+    key->data[4] = (uint8_t)((id->rid >> 16) & 0xff);
+    key->data[5] = (uint8_t)((id->rid >> 8) & 0xff);
+    key->data[6] = (uint8_t)(id->rid & 0xff);
+  }
 
   if(namelen > avail) {
     /* the name does not fit: store as much of it as fits and replace the
@@ -127,15 +193,17 @@ static void dnsc_id2key(struct dnsc_key *key, struct dnsc_id *id)
     size_t i;
 
     namelen = avail - DNSC_KEY_HASHLEN;
-    Curl_strntolower((char *)key->data + 3, curlx_str(&id->name), namelen);
+    Curl_strntolower((char *)key->data + hdrlen, curlx_str(&id->name),
+                     namelen);
     for(i = 0; i < DNSC_KEY_HASHLEN; i++)
-      key->data[3 + namelen + i] = (uint8_t)(hash >> (i * 8));
+      key->data[hdrlen + namelen + i] = (uint8_t)(hash >> (i * 8));
     namelen += DNSC_KEY_HASHLEN;
   }
   else
-    Curl_strntolower((char *)key->data + 3, curlx_str(&id->name), namelen);
+    Curl_strntolower((char *)key->data + hdrlen, curlx_str(&id->name),
+                     namelen);
 
-  key->len = namelen + 3;
+  key->len = namelen + hdrlen;
 }
 
 static void dnscache_entry_free(struct Curl_dns_entry *dns)
@@ -297,11 +365,23 @@ static CURLcode fetch_entry(struct Curl_easy *data,
   if(!dnscache)
     return CURLE_OK;
 
-  dnsc_peer2id(&id, type, peer);
+  dnsc_peer2id(&id, type, data, peer);
   dnsc_id2key(&key, &id);
 
   /* See if it is already in our dns cache */
   dns = Curl_hash_pick(&dnscache->entries, key.data, key.len);
+
+  if(!dns && id.rid) {
+    /* Miss under this handle's resolver identity. A CURLOPT_RESOLVE entry
+       still applies regardless of which resolver a handle is configured
+       to use, so check for one of those before giving up. */
+    struct dnsc_id id0 = id;
+    id0.rid = 0;
+    dnsc_id2key(&key, &id0);
+    dns = Curl_hash_pick(&dnscache->entries, key.data, key.len);
+    if(dns && !dns->user_resolve)
+      dns = NULL;
+  }
 
   for(;;) {
     if(dns && (data->set.dns_cache_timeout_ms != -1)) {
@@ -331,7 +411,7 @@ static CURLcode fetch_entry(struct Curl_easy *data,
       struct Curl_str wildname;
 
       curlx_str_assign(&wildname, "*", 1);
-      dnsc_str2id(&id, CURL_DNST_ADDR, &wildname, peer->port);
+      dnsc_str2id(&id, CURL_DNST_ADDR, &wildname, peer->port, 0);
       dnsc_id2key(&key, &id);
 
       /* See if it is already in our dns cache */
@@ -495,7 +575,8 @@ static bool dnscache_ai_has_family(struct Curl_addrinfo *ai, int ai_family)
 }
 
 static struct Curl_dns_entry *dnsc_entry_create(struct dnsc_id *pid,
-                                                bool permanent)
+                                                bool permanent,
+                                                bool user_resolve)
 {
   struct Curl_dns_entry *dns = NULL;
 
@@ -514,6 +595,7 @@ static struct Curl_dns_entry *dnsc_entry_create(struct dnsc_id *pid,
   if(dns->hostlen)
     memcpy(dns->hostname, curlx_str(&pid->name), dns->hostlen);
   dns->permanent = permanent;
+  dns->user_resolve = user_resolve;
 
 out:
   return dns;
@@ -595,8 +677,8 @@ struct Curl_dns_entry *Curl_dnsc_mk_addr(struct Curl_easy *data,
   struct dnsc_id id;
   struct Curl_dns_entry *dns;
 
-  dnsc_peer2id(&id, CURL_DNST_ADDR, peer);
-  dns = dnsc_entry_create(&id, FALSE);
+  dnsc_peer2id(&id, CURL_DNST_ADDR, data, peer);
+  dns = dnsc_entry_create(&id, FALSE, FALSE);
   dns = dnsc_entry_assign_addr(data, dns, dns_queries, paddr, NULL);
   return dns;
 }
@@ -610,8 +692,8 @@ struct Curl_dns_entry *Curl_dnsc_mk_addr2(struct Curl_easy *data,
   struct dnsc_id id;
   struct Curl_dns_entry *dns;
 
-  dnsc_peer2id(&id, CURL_DNST_ADDR, peer);
-  dns = dnsc_entry_create(&id, FALSE);
+  dnsc_peer2id(&id, CURL_DNST_ADDR, data, peer);
+  dns = dnsc_entry_create(&id, FALSE, FALSE);
   dns = dnsc_entry_assign_addr(data, dns, dns_queries, paddr1, paddr2);
   return dns;
 }
@@ -661,9 +743,8 @@ struct Curl_dns_entry *Curl_dnsc_mk_https(struct Curl_easy *data,
   struct dnsc_id id;
   struct Curl_dns_entry *dns;
 
-  (void)data;
-  dnsc_peer2id(&id, CURL_DNST_HTTPS, peer);
-  dns = dnsc_entry_create(&id, FALSE);
+  dnsc_peer2id(&id, CURL_DNST_HTTPS, data, peer);
+  dns = dnsc_entry_create(&id, FALSE, FALSE);
   dns = dnsc_entry_assign_https(dns, phinfo);
   return dns;
 }
@@ -676,7 +757,7 @@ static struct Curl_dns_entry *dnsc_add_https(struct Curl_easy *data,
   struct Curl_dns_entry *dns, *dns2;
   struct dnsc_key key;
 
-  dns = dnsc_entry_create(id, FALSE);
+  dns = dnsc_entry_create(id, FALSE, FALSE);
   dns = dnsc_entry_assign_https(dns, phinfo);
   if(!dns)
     return NULL;
@@ -706,7 +787,7 @@ static struct Curl_dns_entry *dnsc_add_addr(struct Curl_easy *data,
   struct Curl_dns_entry *dns;
   struct Curl_dns_entry *dns2;
 
-  dns = dnsc_entry_create(id, permanent);
+  dns = dnsc_entry_create(id, permanent, TRUE);
   dns = dnsc_entry_assign_addr(data, dns, dns_queries, paddr, NULL);
   if(!dns)
     return NULL;
@@ -735,7 +816,7 @@ static struct Curl_dns_entry *dnsc_add_peer_addr(
   struct Curl_dns_entry *dns2;
   struct dnsc_key key;
 
-  dns = dnsc_entry_create(id, permanent);
+  dns = dnsc_entry_create(id, permanent, FALSE);
   dns = dnsc_entry_assign_addr(data, dns, dns_queries, paddr, NULL);
   if(!dns)
     return NULL;
@@ -767,7 +848,8 @@ CURLcode Curl_dnscache_add(struct Curl_easy *data,
     return CURLE_BAD_FUNCTION_ARGUMENT;
 
   curlx_str_assign(&name, entry->hostname, entry->hostlen);
-  dnsc_str2id(&id, entry->type, &name, entry->port);
+  dnsc_str2id(&id, entry->type, &name, entry->port,
+              dnsc_resolver_id(data));
   dnsc_id2key(&key, &id);
 
   /* Store the resolved data in our DNS cache and up ref count */
@@ -801,14 +883,14 @@ CURLcode Curl_dnscache_add_negative(struct Curl_easy *data,
 
   if(dns_queries & CURL_DNSQ_ADDR) {
     /* put this new host in the cache */
-    dnsc_peer2id(&id, CURL_DNST_ADDR, peer);
+    dnsc_peer2id(&id, CURL_DNST_ADDR, data, peer);
     dns = dnsc_add_peer_addr(data, dnscache, dns_queries, NULL, &id, FALSE);
     if(!dns)
       result = CURLE_OUT_OF_MEMORY;
   }
 #ifdef USE_HTTPSRR
   else if(dns_queries == CURL_DNSQ_HTTPS) {
-    dnsc_peer2id(&id, CURL_DNST_HTTPS, peer);
+    dnsc_peer2id(&id, CURL_DNST_HTTPS, data, peer);
     dns = dnsc_add_https(data, dnscache, NULL, &id);
     if(!dns)
       result = CURLE_OUT_OF_MEMORY;
@@ -912,7 +994,7 @@ CURLcode Curl_loadhostpairs(struct Curl_easy *data)
 
       if(!curlx_str_number(&host, &num, 0xffff)) {
         /* Create an entry id, based upon the hostname and port */
-        dnsc_str2id(&id, CURL_DNST_ADDR, &source, (uint16_t)num);
+        dnsc_str2id(&id, CURL_DNST_ADDR, &source, (uint16_t)num, 0);
         dnsc_id2key(&key, &id);
         dnscache_lock(data, dnscache);
         /* delete entry, ignore if it did not exist */
@@ -1014,7 +1096,7 @@ err:
         return CURLE_SETOPT_OPTION_SYNTAX;
       }
 
-      dnsc_str2id(&id, CURL_DNST_ADDR, &source, port);
+      dnsc_str2id(&id, CURL_DNST_ADDR, &source, port, 0);
       dnsc_id2key(&key, &id);
       dnscache_lock(data, dnscache);
 

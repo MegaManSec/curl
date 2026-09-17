@@ -42,6 +42,12 @@ option.
 Using this option multiple times makes the last set string override the
 previous ones. Set it to NULL to disable its use again.
 
+Resolved names are kept in a DNS cache that, when using the multi interface,
+is shared by default by all the easy handles added to the same multi handle
+(see CURLSHOPT_SHARE(3)). Cache entries are scoped to this setting, so
+handles that share a cache but set a different CURLOPT_DNS_SERVERS only reuse
+each other's results when the value matches.
+
 # DEFAULT
 
 NULL
