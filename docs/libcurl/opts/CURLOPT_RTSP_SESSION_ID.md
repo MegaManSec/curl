@@ -45,6 +45,11 @@ want to set or clear the Session ID to avoid reuse across different hosts.
 libcurl rejects strings containing CR or LF characters, as they cannot be
 part of the RTSP Session header.
 
+A connection that still has interleaved RTP data pending to be read is not
+reused for a transfer whose Session ID does not match the one the pending
+data belongs to; libcurl opens a new connection for it instead. This keeps
+data belonging to one session from being dispatched to another easy handle.
+
 # DEFAULT
 
 NULL

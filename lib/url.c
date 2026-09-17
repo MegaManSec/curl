@@ -846,6 +846,12 @@ static bool url_match_proto_config(struct connectdata *conn,
       return FALSE;
   }
 #endif
+#ifndef CURL_DISABLE_RTSP
+  else if(get_protocol_family(m->needle->scheme) & PROTO_FAMILY_RTSP) {
+    if(!Curl_rtsp_conns_match(m->data, m->needle, conn))
+      return FALSE;
+  }
+#endif
   return TRUE;
 }
 

@@ -55,9 +55,14 @@ typedef enum {
 } rtp_parse_st;
 
 /* RTSP Connection data
- * Currently, only used for tracking incomplete RTP data reads */
+ * Currently, only used for tracking incomplete RTP data reads and the
+ * Session ID the connection is currently associated with */
 struct rtsp_conn {
   struct dynbuf buf;
+  char *session_id; /* Session ID of the last request/response that used
+                        this connection, used to keep pending interleaved
+                        data from being handed to an unrelated session when
+                        the connection gets reused */
   int rtp_channel;
   size_t rtp_len;
   rtp_parse_st state;
@@ -99,6 +104,7 @@ static void rtsp_conn_dtor(const void *key, size_t klen, void *entry)
   (void)key;
   (void)klen;
   curlx_dyn_free(&rtspc->buf);
+  curlx_free(rtspc->session_id);
   curlx_free(rtspc);
 }
 
@@ -973,6 +979,8 @@ CURLcode Curl_rtsp_parseheader(struct Curl_easy *data, const char *header)
   }
   else if(checkprefix("Session:", header)) {
     const char *start, *end, *str;
+    struct rtsp_conn *rtspc =
+      Curl_conn_meta_get(data->conn, CURL_META_RTSP_CONN);
     size_t idlen;
 
     /* Find the first non-space letter */
@@ -1015,6 +1023,14 @@ CURLcode Curl_rtsp_parseheader(struct Curl_easy *data, const char *header)
          CURL_EASY_STR_SETN(data, STRING_RTSP_SESSION_ID, mem))
         return CURLE_OUT_OF_MEMORY;
     }
+
+    if(rtspc) {
+      char *id = curlx_strdup(CURL_EASY_STR(data, STRING_RTSP_SESSION_ID));
+      if(!id)
+        return CURLE_OUT_OF_MEMORY;
+      curlx_free(rtspc->session_id);
+      rtspc->session_id = id;
+    }
   }
   else if(checkprefix("Transport:", header)) {
     CURLcode result;
@@ -1023,6 +1039,35 @@ CURLcode Curl_rtsp_parseheader(struct Curl_easy *data, const char *header)
       return result;
   }
   return CURLE_OK;
+}
+
+/*
+ * Curl_rtsp_conns_match()
+ *
+ * A connection may still have interleaved RTP data pending that has not
+ * been read off the socket yet. Refuse to hand such a connection to a
+ * transfer whose RTSP Session ID does not match the one the pending data
+ * belongs to, so that data from one session/easy handle cannot end up
+ * being dispatched to another one.
+ */
+bool Curl_rtsp_conns_match(struct Curl_easy *data,
+                           struct connectdata *needle,
+                           struct connectdata *conn)
+{
+  struct rtsp_conn *rtspc = Curl_conn_meta_get(conn, CURL_META_RTSP_CONN);
+  bool input_pending = FALSE;
+  const char *want;
+
+  (void)needle;
+  if(!rtspc)
+    return TRUE;
+
+  Curl_conn_is_alive(data, conn, &input_pending);
+  if(!input_pending)
+    return TRUE;
+
+  want = CURL_EASY_STR(data, STRING_RTSP_SESSION_ID);
+  return want && rtspc->session_id && !strcmp(want, rtspc->session_id);
 }
 
 /*
