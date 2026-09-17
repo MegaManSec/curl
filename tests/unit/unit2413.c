@@ -76,6 +76,61 @@ out:
   return result;
 }
 
+static CURLcode test_connect_to_zoneid(const char *name,
+                                       CURL *curl,
+                                       const char *dest_url,
+                                       const char *connect_to,
+                                       const char *exp_zoneid,
+                                       bool exp_scope_from_dest)
+{
+  CURLU *uh;
+  struct Curl_peer *dest = NULL, *via = NULL;
+  CURLcode result;
+
+  uh = curl_url();
+  if(!uh)
+    return CURLE_OUT_OF_MEMORY;
+
+  if(curl_url_set(uh, CURLUPART_URL, dest_url, 0)) {
+    curl_mfprintf(stderr, "%s: url_set failed", name);
+    result = CURLE_URL_MALFORMAT;
+    goto out;
+  }
+
+  result = Curl_peer_from_url(uh, (struct Curl_easy *)curl, 0, 0, &dest);
+  if(result) {
+    curl_mfprintf(stderr, "%s: dest create failed %d", name, (int)result);
+    goto out;
+  }
+
+  result = Curl_peer_from_connect_to((struct Curl_easy *)curl, dest,
+                                     connect_to, &via);
+  if(result) {
+    curl_mfprintf(stderr, "%s: connect_to failed %d", name, (int)result);
+    goto out;
+  }
+
+  result = CURLE_FAILED_INIT;
+  if(exp_zoneid &&
+     (!via->zoneid || !curl_strequal(exp_zoneid, via->zoneid))) {
+    curl_mfprintf(stderr, "%s: via zoneid=%s, expected %s", name,
+                  via->zoneid, exp_zoneid);
+  }
+  else if(exp_scope_from_dest && (via->scopeid != dest->scopeid)) {
+    curl_mfprintf(stderr, "%s: via scopeid=%u, expected dest scopeid %u",
+                  name, via->scopeid, dest->scopeid);
+  }
+  else
+    result = CURLE_OK;
+
+out:
+  Curl_peer_unlink(&via);
+  Curl_peer_unlink(&dest);
+  curl_url_cleanup(uh);
+  fail_unless(!result, "check failed");
+  return result;
+}
+
 static CURLcode test_unit2413(const char *arg)
 {
   UNITTEST_BEGIN_SIMPLE
@@ -102,6 +157,11 @@ static CURLcode test_unit2413(const char *arg)
                   "::1", TRUE, "tada");
   test_create2413("peer7", curl, &Curl_scheme_https, "::1%tada", 1234,
                   "::1", TRUE, "tada");
+
+  test_connect_to_zoneid("conn1", curl, "https://[fe80::1%tada]/",
+                         ":8080", "tada", TRUE);
+  test_connect_to_zoneid("conn2", curl, "https://[fe80::1%tada]/",
+                         "[fe80::2%other]:8080", "other", FALSE);
 
   curl_easy_cleanup(curl);
   curl_global_cleanup();

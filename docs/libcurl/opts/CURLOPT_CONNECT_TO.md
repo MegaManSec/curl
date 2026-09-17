@@ -51,6 +51,9 @@ CONNECT-TO-HOST or CONNECT-TO-PORT is empty, the "connect to" feature is
 disabled for the host or port, and the request's host or port are used to
 establish the network connection.
 
+When CONNECT-TO-HOST is empty and the request's host is a scoped IPv6
+address, the request's IPv6 zone identifier is retained for the connection.
+
 This option is suitable to direct the request at a specific server, e.g. at a
 specific cluster node in a cluster of servers.
 
