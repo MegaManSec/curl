@@ -489,6 +489,10 @@ CURLcode Curl_http_proxy_inspect_tunnel_response(
                                   auth_reply->value);
     if(result)
       return result;
+    data->info.httpproxycode = data->req.httpcode = resp->status;
+    result = Curl_http_auth_act(data);
+    if(result)
+      return result;
     if(data->req.newurl) {
       curlx_safefree(data->req.newurl);
       *presult = PROXY_INSPECT_AUTH_RETRY;
@@ -536,6 +540,7 @@ CURLcode Curl_http_proxy_inspect_tunnel_response(
     return CURLE_OK;
   }
 
+  failf(data, "CONNECT tunnel failed, response %d", resp->status);
   *presult = PROXY_INSPECT_FAILED;
   return CURLE_COULDNT_CONNECT;
 }
