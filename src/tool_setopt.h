@@ -96,16 +96,17 @@ CURLcode tool_setopt_long_force(CURL *curl, const char *name, CURLoption tag,
                                 long lval);
 CURLcode tool_setopt_offt(CURL *curl, const char *name, CURLoption tag,
                           curl_off_t lval);
-CURLcode tool_setopt_str(CURL *curl, struct OperationConfig *config,
-                         const char *name, CURLoption tag,
+CURLcode tool_setopt_str(CURL *curl, const char *name, CURLoption tag,
                          const char *value) WARN_UNUSED_RESULT;
+CURLcode tool_setopt_postfields(CURL *curl, const char *value,
+                                curl_off_t len) WARN_UNUSED_RESULT;
 CURLcode tool_setopt_ptr(CURL *curl, const char *name, CURLoption tag, ...);
 
 #define my_setopt_long(x, y, z)       tool_setopt_long(x, #y, y, z)
 #define my_setopt_long_force(x, y, z) tool_setopt_long_force(x, #y, y, z)
 #define my_setopt_offt(x, y, z)       tool_setopt_offt(x, #y, y, z)
 #define my_setopt_ptr(x, y, z)        tool_setopt_ptr(x, #y, y, z)
-#define my_setopt_str(x, y, z)        tool_setopt_str(x, config, #y, y, z)
+#define my_setopt_str(x, y, z)        tool_setopt_str(x, #y, y, z)
 #define my_setopt_mimepost(x, y, z)   tool_setopt_mimepost(x, config, #y, y, z)
 #define my_setopt_slist(x, y, z)      tool_setopt_slist(x, #y, y, z)
 #define my_setopt_SSLVERSION(x, y, z) tool_setopt_SSLVERSION(x, #y, y, z)
@@ -116,11 +117,18 @@ CURLcode tool_setopt_ptr(CURL *curl, const char *name, CURLoption tag, ...);
 
 /* assumes a 'result' variable to use. If the return code is benign it is left
    in 'result' after this call, otherwise the function returns the error */
-#define MY_SETOPT_STR(x, y, z)                     \
-  do {                                             \
-    result = tool_setopt_str(x, config, #y, y, z); \
-    if(setopt_bad(result))                         \
-      return result;                               \
+#define MY_SETOPT_STR(x, y, z)               \
+  do {                                        \
+    result = tool_setopt_str(x, #y, y, z);    \
+    if(setopt_bad(result))                    \
+      return result;                          \
+  } while(0)
+
+#define MY_SETOPT_POSTFIELDS(x, value, len)               \
+  do {                                                     \
+    result = tool_setopt_postfields(x, value, len);        \
+    if(setopt_bad(result))                                 \
+      return result;                                       \
   } while(0)
 
 #else /* CURL_DISABLE_LIBCURL_OPTION */
@@ -143,6 +151,17 @@ CURLcode tool_setopt_ptr(CURL *curl, const char *name, CURLoption tag, ...);
     result = curl_easy_setopt(x, y, z); \
     if(setopt_bad(result))              \
       return result;                    \
+  } while(0)
+
+#define MY_SETOPT_POSTFIELDS(x, value, len)                        \
+  do {                                                              \
+    result = curl_easy_setopt(x, CURLOPT_POSTFIELDS, value);        \
+    if(setopt_bad(result))                                          \
+      return result;                                                \
+    result = curl_easy_setopt(x, CURLOPT_POSTFIELDSIZE_LARGE,       \
+                              (curl_off_t)(len));                   \
+    if(setopt_bad(result))                                          \
+      return result;                                                \
   } while(0)
 
 #endif /* CURL_DISABLE_LIBCURL_OPTION */

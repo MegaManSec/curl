@@ -929,10 +929,8 @@ static CURLcode setopt_post(struct OperationConfig *config, CURL *curl)
   case TOOL_HTTPREQ_SIMPLEPOST:
     result = check_post_resume(config);
     if(!result) {
-      MY_SETOPT_STR(curl, CURLOPT_POSTFIELDS,
-                    curlx_dyn_ptr(&config->postdata));
-      my_setopt_offt(curl, CURLOPT_POSTFIELDSIZE_LARGE,
-                     curlx_dyn_len(&config->postdata));
+      MY_SETOPT_POSTFIELDS(curl, curlx_dyn_ptr(&config->postdata),
+                           curlx_dyn_len(&config->postdata));
     }
     break;
   case TOOL_HTTPREQ_MIMEPOST:
