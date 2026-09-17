@@ -82,3 +82,15 @@ class TestPush:
         r.check_exit_code(0)
         assert os.path.exists(client.download_file(0))
         assert os.path.exists(os.path.join(client.run_dir, 'push0')), r.dump_logs()
+
+    # a push callback that returns CURL_PUSH_ERROROUT must fail the parent
+    # transfer, not just cancel the pushed stream
+    @pytest.mark.skipif(condition=not Env.have_h2_curl(), reason="curl without h2")
+    def test_09_03_h2_push_erroroout(self, env: Env, httpd, configures_httpd):
+        self.httpd_configure(env, httpd)
+        url = f'https://localhost:{env.https_port}/push/data1'
+        client = LocalClient(name='cli_h2_push_erroroout', env=env)
+        if not client.exists():
+            pytest.skip(f'example client not built: {client.name}')
+        r = client.run(args=[url])
+        r.check_exit_code(0)

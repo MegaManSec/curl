@@ -1005,13 +1005,14 @@ static CURLcode on_stream_frame(struct Curl_cfilter *cf,
   case NGHTTP2_PUSH_PROMISE:
     rv = push_promise(cf, data, &frame->push_promise);
     if(rv) { /* deny! */
+      int px_rv = rv;
       DEBUGASSERT((rv > CURL_PUSH_OK) && (rv <= CURL_PUSH_ERROROUT));
       rv = nghttp2_submit_rst_stream(ctx->h2, NGHTTP2_FLAG_NONE,
                                      frame->push_promise.promised_stream_id,
                                      NGHTTP2_CANCEL);
       if(nghttp2_is_fatal(rv))
         return CURLE_SEND_ERROR;
-      else if(rv == CURL_PUSH_ERROROUT) {
+      else if(px_rv == CURL_PUSH_ERROROUT) {
         CURL_TRC_CF(data, cf, "[%d] fail in PUSH_PROMISE received",
                     stream_id);
         return CURLE_RECV_ERROR;
