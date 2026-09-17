@@ -536,6 +536,7 @@ struct UrlState {
 
   struct curltime keeps_speed; /* for the progress meter really */
   struct dynbuf headerb; /* buffer to store headers in */
+  size_t foldbytes; /* raw bytes discarded while unfolding headerb */
 #ifndef CURL_DISABLE_HSTS
   struct curl_slist *hstslist; /* list of HSTS files set by
                                   curl_easy_setopt(HSTS) calls */
