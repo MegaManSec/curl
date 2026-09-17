@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTPS
+OCSP
+</keywords>
+</info>
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<features>
+wolfssl
+</features>
+<name>
+--cert-status fails hard when unsupported by the SSL backend
+</name>
+<command>
+--cert-status https://test.example.com.%TESTNUMBER/
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+91
+</errorcode>
+<stderr mode="text">
+curl: --cert-status not supported by libcurl with wolfSSL, refusing to
+curl: proceed without certificate status verification
+</stderr>
+<stripfile>
+s/wolfSSL\/[0-9.]+/wolfSSL/
+s/[ \t]+$//
+</stripfile>
+</verify>
+</testcase>

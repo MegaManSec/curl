@@ -462,11 +462,27 @@ static CURLcode ssl_setopts(struct OperationConfig *config, CURL *curl)
     my_setopt_long(curl, CURLOPT_PROXY_SSL_VERIFYHOST, 0);
   }
 
-  if(config->verifystatus)
-    my_setopt_long(curl, CURLOPT_SSL_VERIFYSTATUS, 1);
+  if(config->verifystatus) {
+    result = my_setopt_long(curl, CURLOPT_SSL_VERIFYSTATUS, 1);
+    if((result == CURLE_NOT_BUILT_IN) || (result == CURLE_UNKNOWN_OPTION)) {
+      errorf("--cert-status not supported by libcurl with %s, refusing to "
+             "proceed without certificate status verification",
+             ssl_backend());
+      config->synthetic_error = TRUE;
+      return CURLE_SSL_INVALIDCERTSTATUS;
+    }
+  }
 
-  if(config->doh_verifystatus)
-    my_setopt_long(curl, CURLOPT_DOH_SSL_VERIFYSTATUS, 1);
+  if(config->doh_verifystatus) {
+    result = my_setopt_long(curl, CURLOPT_DOH_SSL_VERIFYSTATUS, 1);
+    if((result == CURLE_NOT_BUILT_IN) || (result == CURLE_UNKNOWN_OPTION)) {
+      errorf("--doh-cert-status not supported by libcurl with %s, refusing "
+             "to proceed without certificate status verification",
+             ssl_backend());
+      config->synthetic_error = TRUE;
+      return CURLE_SSL_INVALIDCERTSTATUS;
+    }
+  }
 
   my_setopt_SSLVERSION(curl, CURLOPT_SSLVERSION,
                        tlsversion(config->ssl_version,

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTPS
+OCSP
+DoH
+</keywords>
+</info>
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<features>
+wolfssl
+</features>
+<name>
+--doh-cert-status fails hard when unsupported by the SSL backend
+</name>
+<command>
+--doh-cert-status --doh-url https://doh.example.com.%TESTNUMBER/ https://test.example.com.%TESTNUMBER/
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+91
+</errorcode>
+<stderr mode="text">
+curl: --doh-cert-status not supported by libcurl with wolfSSL, refusing
+curl: to proceed without certificate status verification
+</stderr>
+<stripfile>
+s/wolfSSL\/[0-9.]+/wolfSSL/
+s/[ \t]+$//
+</stripfile>
+</verify>
+</testcase>

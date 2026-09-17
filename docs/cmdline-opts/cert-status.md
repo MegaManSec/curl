@@ -23,3 +23,7 @@ response, if the response suggests that the server certificate has been
 revoked, or no response at all is received, the verification fails.
 
 This support is currently only implemented in the OpenSSL and GnuTLS backends.
+
+If the TLS backend curl was built to use does not support certificate status
+verification, this option makes curl fail instead of silently connecting
+without enforcing it.
