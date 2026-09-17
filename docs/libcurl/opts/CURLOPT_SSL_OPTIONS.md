@@ -95,6 +95,11 @@ certificate that supports client authentication in the OS certificate store it
 could be a privacy violation and unexpected.
 (Added in 7.77.0)
 
+This only applies to the initial origin of a transfer: if a redirect changes
+the origin, libcurl does not automatically select a client certificate for
+the new origin, and a cached TLS session or credential that used automatic
+client certificate selection is not reused for it either.
+
 ## CURLSSLOPT_EARLYDATA
 
 Tell libcurl to try sending application data as TLS1.3 early data. This option

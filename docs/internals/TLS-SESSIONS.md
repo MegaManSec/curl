@@ -80,7 +80,11 @@ filters talking through a tunnel differ, as they talk to different peers.
 
 If the connection filter wants to use a client certificate, the cache checks
 those as well. If the cache peer carries client certs, the connection filter
-must have those with the same values (and vice versa).
+must have those with the same values (and vice versa). This also applies to
+Schannel's CURLSSLOPT_AUTO_CLIENT_CERT, whose effective, origin-scoped state
+is part of the peer key, so a cached credential that used automatic
+client certificate selection cannot be resumed for a connection where that
+would not apply.
 
 On a match, the connection filter gets the session ticket and feeds that to
 the TLS implementation which, on accepting it, tries to resume it for a

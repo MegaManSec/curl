@@ -148,6 +148,11 @@ static CURLcode cf_ssl_peer_key_add_mtls(struct dynbuf *buf,
                                          bool *is_local)
 {
   CURLcode result = CURLE_OK;
+  if(ssl->auto_client_cert) {
+    result = curlx_dyn_add(buf, ":AUTOCCERT");
+    if(result)
+      goto out;
+  }
   if(ssl->clientcert && ssl->clientcert[0]) {
     result = cf_ssl_peer_key_add_path(buf, "CCERT", ssl->clientcert, is_local);
     if(result)
