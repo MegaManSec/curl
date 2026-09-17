@@ -110,7 +110,7 @@ size_t tool_read_cb(char *buffer, size_t sz, size_t nmemb, void *userdata)
     if(rc < 0) {
       if(SOCK_EAGAIN(SOCKERRNO)) {
         errno = 0;
-        config->readbusy = TRUE;
+        per->readbusy = TRUE;
         return CURL_READFUNC_PAUSE;
       }
 
@@ -128,7 +128,7 @@ size_t tool_read_cb(char *buffer, size_t sz, size_t nmemb, void *userdata)
     if(rc < 0) {
       if(errno == EAGAIN) {
         errno = 0;
-        config->readbusy = TRUE;
+        per->readbusy = TRUE;
         return CURL_READFUNC_PAUSE;
       }
       /* since size_t is unsigned we cannot return negative values fine */
@@ -145,7 +145,7 @@ size_t tool_read_cb(char *buffer, size_t sz, size_t nmemb, void *userdata)
           delta);
     rc = (ssize_t)(per->uploadfilesize - per->uploadedsofar);
   }
-  config->readbusy = FALSE;
+  per->readbusy = FALSE;
 
   /* when select() returned zero here, it timed out */
   return (size_t)rc;
@@ -159,7 +159,6 @@ int tool_readbusy_cb(void *clientp,
                      curl_off_t ultotal, curl_off_t ulnow)
 {
   struct per_transfer *per = clientp;
-  struct OperationConfig *config = per->config;
   static curl_off_t ulprev;
 
   (void)dltotal;
@@ -167,7 +166,7 @@ int tool_readbusy_cb(void *clientp,
   (void)ultotal;
   (void)ulnow;
 
-  if(config->readbusy) {
+  if(per->readbusy) {
     if(ulprev == ulnow) {
 #ifndef _WIN32
       waitfd(1, per->infd);
@@ -176,7 +175,7 @@ int tool_readbusy_cb(void *clientp,
 #endif
     }
 
-    config->readbusy = FALSE;
+    per->readbusy = FALSE;
     curl_easy_pause(per->curl, CURLPAUSE_CONT);
   }
 
