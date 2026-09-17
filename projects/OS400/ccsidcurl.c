@@ -877,8 +877,8 @@ CURLFORMcode curl_formadd_ccsid(struct curl_httppost **httppost,
     case CURLFORM_COPYCONTENTS:
       if(contentx >= 0)
         result = CURL_FORMADD_OPTION_TWICE;
-
-      contentx = nargs;
+      else
+        contentx = nargs;
 
       if(!forms) {
         value = va_arg(arg, char *);
