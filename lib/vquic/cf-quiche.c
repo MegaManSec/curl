@@ -488,6 +488,12 @@ static void cf_quiche_recv_body(struct Curl_cfilter *cf,
   if(!stream)
     return;
 
+  if(Curl_xfer_write_is_paused(data)) {
+    CURL_TRC_CF(data, cf, "[%" PRIu64 "] recv_body, transfer paused, "
+                "not draining more from quiche", stream->id);
+    return;
+  }
+
   /* Even when the transfer has already errored, we need to receive
    * the data from quiche, as quiche otherwise gets stuck and
    * raise events to receive over and over again. */
