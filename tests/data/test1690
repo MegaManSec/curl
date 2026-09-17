@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+unittest
+HSTS
+cookies
+</keywords>
+</info>
+
+<client>
+<features>
+unittest
+</features>
+<name>
+Curl_fopen does not truncate an existing file before the temp copy is ready
+</name>
+
+<command>
+%LOGDIR/fopen%TESTNUMBER
+</command>
+</client>
+</testcase>
