@@ -114,6 +114,9 @@ struct sbuffer {
 struct schannel_ssl_backend_data {
   unsigned char *send_buffer;
   size_t send_buffer_len;
+  size_t send_blocked_len; /* encrypted bytes still queued in send_buffer,
+                               0 if none */
+  size_t send_blocked_sent; /* bytes of send_blocked_len already written */
   struct sbuffer encdata;
   struct sbuffer decdata;
   struct Curl_schannel_cred *cred;
