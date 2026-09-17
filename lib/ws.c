@@ -123,6 +123,7 @@ struct websocket {
   struct curl_ws_frame recvframe;  /* the current WS FRAME received */
   struct ws_cntrl_frame pending; /* a control frame pending to be sent */
   size_t sendbuf_payload; /* number of payload bytes in sendbuf */
+  BIT(recv_in_progress); /* a raw network read into recvbuf is ongoing */
 };
 
 #ifdef CURLVERBOSE
@@ -1642,7 +1643,15 @@ CURLcode curl_ws_recv(CURL *curl, void *buffer,
       /* receive more when our buffer is empty */
       if(Curl_bufq_is_empty(&ws->recvbuf)) {
         size_t n;
+
+        if(ws->recv_in_progress) {
+          /* reentered while a raw read into recvbuf is uncommitted */
+          result = CURLE_RECURSIVE_API_CALL;
+          goto out;
+        }
+        ws->recv_in_progress = TRUE;
         result = Curl_bufq_slurp(&ws->recvbuf, nw_in_recv, data, &n);
+        ws->recv_in_progress = FALSE;
         if(result)
           goto out;
         else if(n == 0) {
