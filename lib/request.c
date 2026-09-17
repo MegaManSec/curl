@@ -106,8 +106,7 @@ CURLcode Curl_req_done(struct SingleRequest *req,
   (void)req;
   if(!aborted)
     (void)req_flush(data);
-  Curl_client_reset(data);
-  return CURLE_OK;
+  return Curl_client_reset(data);
 }
 
 void Curl_req_hard_reset(struct SingleRequest *req, struct Curl_easy *data)

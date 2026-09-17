@@ -604,11 +604,13 @@ static CURLcode ws_cw_init(struct Curl_easy *data,
   return CURLE_OK;
 }
 
-static void ws_cw_close(struct Curl_easy *data, struct Curl_cwriter *writer)
+static CURLcode ws_cw_close(struct Curl_easy *data,
+                            struct Curl_cwriter *writer)
 {
   struct ws_cw_ctx *ctx = writer->ctx;
   (void)data;
   Curl_bufq_free(&ctx->buf);
+  return CURLE_OK;
 }
 
 struct ws_cw_dec_ctx {

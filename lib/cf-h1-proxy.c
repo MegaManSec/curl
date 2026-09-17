@@ -795,7 +795,7 @@ out:
     cf->connected = TRUE;
     /* The real request will follow the CONNECT, reset request partially */
     Curl_req_soft_reset(&data->req, data);
-    Curl_client_reset(data);
+    (void)Curl_client_reset(data);
     Curl_pgrsReset(data);
     cf_tunnel_free(cf, data);
   }

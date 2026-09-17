@@ -121,6 +121,22 @@ static CURLcode exit_zlib(struct Curl_easy *data, z_stream *z,
   return result;
 }
 
+static CURLcode zlib_do_close(struct Curl_easy *data,
+                              struct Curl_cwriter *writer)
+{
+  struct zlib_writer *zp = (struct zlib_writer *)writer;
+  CURLcode result = CURLE_OK;
+
+  if(zp->z.total_in &&
+     (zp->zlib_init == ZLIB_INIT ||
+      zp->zlib_init == ZLIB_INFLATING ||
+      zp->zlib_init == ZLIB_INIT_GZIP)) {
+    failf(data, "Compressed content did not end cleanly, data truncated?");
+    result = CURLE_BAD_CONTENT_ENCODING;
+  }
+  return exit_zlib(data, &zp->z, &zp->zlib_init, result);
+}
+
 static CURLcode process_trailer(struct Curl_easy *data, struct zlib_writer *zp)
 {
   z_stream *z = &zp->z;
@@ -285,15 +301,6 @@ static CURLcode deflate_do_write(struct Curl_easy *data,
   return inflate_stream(data, writer, type, ZLIB_INFLATING);
 }
 
-static void deflate_do_close(struct Curl_easy *data,
-                             struct Curl_cwriter *writer)
-{
-  struct zlib_writer *zp = (struct zlib_writer *)writer;
-  z_stream *z = &zp->z; /* zlib state structure */
-
-  exit_zlib(data, z, &zp->zlib_init, CURLE_OK);
-}
-
 static const struct Curl_cwtype deflate_encoding = {
   "deflate",
   NULL,
@@ -301,7 +308,7 @@ static const struct Curl_cwtype deflate_encoding = {
   deflate_do_init,
   deflate_do_write,
   Curl_cwriter_def_flush,
-  deflate_do_close,
+  zlib_do_close,
   sizeof(struct zlib_writer)
 };
 
@@ -348,15 +355,6 @@ static CURLcode gzip_do_write(struct Curl_easy *data,
   return exit_zlib(data, z, &zp->zlib_init, CURLE_WRITE_ERROR);
 }
 
-static void gzip_do_close(struct Curl_easy *data,
-                          struct Curl_cwriter *writer)
-{
-  struct zlib_writer *zp = (struct zlib_writer *)writer;
-  z_stream *z = &zp->z; /* zlib state structure */
-
-  exit_zlib(data, z, &zp->zlib_init, CURLE_OK);
-}
-
 static const struct Curl_cwtype gzip_encoding = {
   "gzip",
   "x-gzip",
@@ -364,7 +362,7 @@ static const struct Curl_cwtype gzip_encoding = {
   gzip_do_init,
   gzip_do_write,
   Curl_cwriter_def_flush,
-  gzip_do_close,
+  zlib_do_close,
   sizeof(struct zlib_writer)
 };
 
@@ -376,6 +374,7 @@ struct brotli_writer {
   struct Curl_cwriter super;
   char buffer[DECOMPRESS_BUFFER_SIZE];
   BrotliDecoderState *br; /* State structure for brotli. */
+  bool seen_data;         /* Whether any body bytes were fed in. */
 };
 
 static CURLcode brotli_map_error(BrotliDecoderErrorCode be)
@@ -442,6 +441,7 @@ static CURLcode brotli_do_write(struct Curl_easy *data,
   if(!bp->br)
     return CURLE_WRITE_ERROR; /* Stream already ended. */
 
+  bp->seen_data = TRUE;
   while((nbytes || r == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) &&
         result == CURLE_OK) {
 
@@ -480,16 +480,21 @@ static CURLcode brotli_do_write(struct Curl_easy *data,
   return result;
 }
 
-static void brotli_do_close(struct Curl_easy *data,
-                            struct Curl_cwriter *writer)
+static CURLcode brotli_do_close(struct Curl_easy *data,
+                                struct Curl_cwriter *writer)
 {
   struct brotli_writer *bp = (struct brotli_writer *)writer;
-  (void)data;
+  CURLcode result = CURLE_OK;
 
   if(bp->br) {
+    if(bp->seen_data && !BrotliDecoderIsFinished(bp->br)) {
+      failf(data, "Compressed content did not end cleanly, data truncated?");
+      result = CURLE_BAD_CONTENT_ENCODING;
+    }
     BrotliDecoderDestroyInstance(bp->br);
     bp->br = NULL;
   }
+  return result;
 }
 
 static const struct Curl_cwtype brotli_encoding = {
@@ -510,6 +515,8 @@ struct zstd_writer {
   struct Curl_cwriter super;
   ZSTD_DStream *zds; /* State structure for zstd. */
   char buffer[DECOMPRESS_BUFFER_SIZE];
+  bool seen_data;      /* Whether any body bytes were fed in. */
+  bool frame_complete; /* Whether the zstd frame was fully decoded. */
 };
 
 #ifdef ZSTD_STATIC_LINKING_ONLY
@@ -560,6 +567,7 @@ static CURLcode zstd_do_write(struct Curl_easy *data,
   if(!(type & CLIENTWRITE_BODY) || !nbytes)
     return Curl_cwriter_write(data, writer->next, type, buf, nbytes);
 
+  zp->seen_data = TRUE;
   in.pos = 0;
   in.src = buf;
   in.size = nbytes;
@@ -582,6 +590,7 @@ static CURLcode zstd_do_write(struct Curl_easy *data,
     if(ZSTD_isError(errorCode)) {
       return CURLE_BAD_CONTENT_ENCODING;
     }
+    zp->frame_complete = (errorCode == 0);
     if(out.pos > 0) {
       result = Curl_cwriter_write(data, writer->next, type,
                                   zp->buffer, out.pos);
@@ -595,16 +604,21 @@ static CURLcode zstd_do_write(struct Curl_easy *data,
   return result;
 }
 
-static void zstd_do_close(struct Curl_easy *data,
-                          struct Curl_cwriter *writer)
+static CURLcode zstd_do_close(struct Curl_easy *data,
+                              struct Curl_cwriter *writer)
 {
   struct zstd_writer *zp = (struct zstd_writer *)writer;
-  (void)data;
+  CURLcode result = CURLE_OK;
 
   if(zp->zds) {
+    if(zp->seen_data && !zp->frame_complete) {
+      failf(data, "Compressed content did not end cleanly, data truncated?");
+      result = CURLE_BAD_CONTENT_ENCODING;
+    }
     ZSTD_freeDStream(zp->zds);
     zp->zds = NULL;
   }
+  return result;
 }
 
 static const struct Curl_cwtype zstd_encoding = {
@@ -702,11 +716,12 @@ static CURLcode error_do_write(struct Curl_easy *data,
   return CURLE_BAD_CONTENT_ENCODING;
 }
 
-static void error_do_close(struct Curl_easy *data,
-                           struct Curl_cwriter *writer)
+static CURLcode error_do_close(struct Curl_easy *data,
+                               struct Curl_cwriter *writer)
 {
   (void)data;
   (void)writer;
+  return CURLE_OK;
 }
 
 static const struct Curl_cwtype error_writer = {

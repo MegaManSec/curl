@@ -2176,6 +2176,9 @@ TESTCASES = \
   test3604 \
   test3800 \
   test3901 \
+  test3910 \
+  test3911 \
+  test3912 \
   test3920 \
   test4000 \
   test4001 \

@@ -418,11 +418,12 @@ static CURLcode cw_chunked_init(struct Curl_easy *data,
   return CURLE_OK;
 }
 
-static void cw_chunked_close(struct Curl_easy *data,
-                             struct Curl_cwriter *writer)
+static CURLcode cw_chunked_close(struct Curl_easy *data,
+                                 struct Curl_cwriter *writer)
 {
   struct chunked_writer *ctx = writer->ctx;
   Curl_httpchunk_free(data, &ctx->ch);
+  return CURLE_OK;
 }
 
 static CURLcode cw_chunked_write(struct Curl_easy *data,

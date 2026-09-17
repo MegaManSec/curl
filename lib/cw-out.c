@@ -124,12 +124,14 @@ static void cw_out_bufs_free(struct cw_out_ctx *ctx)
   ctx->buffered_len = 0;
 }
 
-static void cw_out_close(struct Curl_easy *data, struct Curl_cwriter *writer)
+static CURLcode cw_out_close(struct Curl_easy *data,
+                             struct Curl_cwriter *writer)
 {
   struct cw_out_ctx *ctx = writer->ctx;
 
   (void)data;
   cw_out_bufs_free(ctx);
+  return CURLE_OK;
 }
 
 /**
