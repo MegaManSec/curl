@@ -1179,6 +1179,8 @@ struct Curl_easy {
    * libcurl application or implicitly during `curl_easy_perform()`,
    * a unique identifier inside this one multi instance. */
   uint32_t mid;
+  uint32_t mid_gen; /* generation of `mid` in multi->xfers, at the time
+                       it was assigned to this handle */
   CURLMstate mstate;  /* the handle's state */
   CURLcode result;   /* previous result */
 

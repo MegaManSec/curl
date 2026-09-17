@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+CURLMOPT_NOTIFYFUNCTION
+CURLMNOTIFY_EASY_DONE
+multi
+</keywords>
+</info>
+
+<reply>
+</reply>
+
+<client>
+<features>
+file
+</features>
+<tool>
+lib%TESTNUMBER
+</tool>
+
+<name>
+CURLMOPT_NOTIFYFUNCTION does not misdeliver a stale recycled-id entry
+</name>
+<command>
+file://%FILE_PWD/%LOGDIR/data%TESTNUMBER
+</command>
+<file name="%LOGDIR/data%TESTNUMBER">
+hello
+</file>
+</client>
+
+# Verify that a stale, queued notification for a removed handle whose
+# internal id gets recycled by a replacement handle before dispatch is
+# dropped rather than delivered against the replacement.
+<verify>
+<errorcode>
+0
+</errorcode>
+<stdout>
+notify count: 2
+</stdout>
+</verify>
+
+</testcase>

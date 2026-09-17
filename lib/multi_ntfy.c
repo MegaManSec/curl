@@ -37,6 +37,7 @@
 
 struct mntfy_entry {
   uint32_t mid;
+  uint32_t gen;
   uint32_t type;
 };
 
@@ -74,6 +75,7 @@ static bool mntfy_chunk_append(struct mntfy_chunk *chunk,
     return FALSE;
   e = &chunk->entries[chunk->w_offset++];
   e->mid = data->mid;
+  e->gen = data->mid_gen;
   e->type = type;
   return TRUE;
 }
@@ -111,6 +113,11 @@ static void mntfy_chunk_dispatch_all(struct Curl_multi *multi,
   while((chunk->r_offset < chunk->w_offset) && !multi->ntfy.failure) {
     e = &chunk->entries[chunk->r_offset];
     data = e->mid ? Curl_multi_get_easy(multi, e->mid) : multi->admin;
+    /* the mid may have been recycled for a different easy handle since
+     * this notification was queued, do not deliver it in that case */
+    if(data && e->mid &&
+       (Curl_uint32_tbl_gen(&multi->xfers, e->mid) != e->gen))
+      data = NULL;
     /* only when notification has not been disabled in the meantime */
     if(multi->ntfy.ntfy_cb && data &&
        (multi->ntfy.flags & CURL_MNTFY_TYPE_FLAG(e->type))) {

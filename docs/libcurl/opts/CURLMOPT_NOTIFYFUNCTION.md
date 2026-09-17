@@ -89,6 +89,11 @@ transfers.
 The *easy* handle passed is the transfer that is done. This *may* be
 an internal handle when DoH or other features are used.
 
+If the callback removes an easy handle with a notification still queued
+behind the one it is currently handling, and a new easy handle added
+afterwards happens to get assigned the same internal transfer id, the
+stale notification is dropped rather than delivered for the new handle.
+
 *easy* identifies the transfer involved. This may be one of the
 application's own easy handle or an internal handle.
 
