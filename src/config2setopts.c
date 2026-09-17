@@ -379,13 +379,37 @@ static CURLcode ssl_setopts(struct OperationConfig *config, CURL *curl)
 {
   CURLcode result = CURLE_OK;
 
-  if(config->crlfile)
+  if(config->crlfile) {
     MY_SETOPT_STR(curl, CURLOPT_CRLFILE, config->crlfile);
-  if(config->proxy_crlfile)
+    if((result == CURLE_NOT_BUILT_IN) || (result == CURLE_UNKNOWN_OPTION)) {
+      errorf("--crlfile not supported by libcurl with %s, refusing to "
+             "proceed without certificate revocation checking",
+             ssl_backend());
+      config->synthetic_error = TRUE;
+      return CURLE_SSL_CRL_BADFILE;
+    }
+  }
+  if(config->proxy_crlfile) {
     MY_SETOPT_STR(curl, CURLOPT_PROXY_CRLFILE, config->proxy_crlfile);
-  else if(config->crlfile)
+    if((result == CURLE_NOT_BUILT_IN) || (result == CURLE_UNKNOWN_OPTION)) {
+      errorf("--proxy-crlfile not supported by libcurl with %s, refusing "
+             "to proceed without certificate revocation checking",
+             ssl_backend());
+      config->synthetic_error = TRUE;
+      return CURLE_SSL_CRL_BADFILE;
+    }
+  }
+  else if(config->crlfile) {
     /* CURLOPT_PROXY_CRLFILE default is crlfile */
     MY_SETOPT_STR(curl, CURLOPT_PROXY_CRLFILE, config->crlfile);
+    if((result == CURLE_NOT_BUILT_IN) || (result == CURLE_UNKNOWN_OPTION)) {
+      errorf("--crlfile not supported by libcurl with %s for the proxy "
+             "connection, refusing to proceed without certificate "
+             "revocation checking", ssl_backend());
+      config->synthetic_error = TRUE;
+      return CURLE_SSL_CRL_BADFILE;
+    }
+  }
 
   if(config->pinnedpubkey) {
     MY_SETOPT_STR(curl, CURLOPT_PINNEDPUBLICKEY, config->pinnedpubkey);

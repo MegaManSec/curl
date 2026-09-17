@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTPS
+CRL
+proxy
+</keywords>
+</info>
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<features>
+wolfssl
+</features>
+<name>
+--proxy-crlfile fails hard when unsupported by the SSL backend
+</name>
+<command>
+--proxy-crlfile %LOGDIR/crl%TESTNUMBER.pem https://test.example.com.%TESTNUMBER/
+</command>
+<file name="%LOGDIR/crl%TESTNUMBER.pem">
+not a real CRL
+</file>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+82
+</errorcode>
+<stderr mode="text">
+curl: --proxy-crlfile not supported by libcurl with wolfSSL, refusing to
+curl: proceed without certificate revocation checking
+</stderr>
+<stripfile>
+s/wolfSSL\/[0-9.]+/wolfSSL/
+s/[ \t]+$//
+</stripfile>
+</verify>
+</testcase>

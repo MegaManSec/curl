@@ -19,3 +19,7 @@ Example:
 
 Provide a file using PEM format with a Certificate Revocation List that may
 specify peer certificates that are to be considered revoked.
+
+If the TLS backend curl was built to use does not support CRL checking, this
+option makes curl fail instead of silently connecting without enforcing the
+revocation list.

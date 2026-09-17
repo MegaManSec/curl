@@ -21,3 +21,7 @@ that specifies peer certificates that are considered revoked when
 communicating with an HTTPS proxy.
 
 Equivalent to --crlfile but only used in HTTPS proxy context.
+
+If the TLS backend curl was built to use does not support CRL checking, this
+option makes curl fail instead of silently connecting without enforcing the
+revocation list.
