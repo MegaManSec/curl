@@ -907,25 +907,14 @@ static bool replace_existing(struct Curl_easy *data,
       if(matching_domains && /* the domains were identical */
          clist->path && co->path && /* both have paths */
          clist->secure && !co->secure && !secure) {
-        size_t cllen;
-        const char *sep = NULL;
-
         /*
          * A non-secure cookie may not overlay an existing secure cookie.
          * For an existing cookie "a" with path "/login", refuse a new
          * cookie "a" with for example path "/login/en", while the path
          * "/loginhelper" is ok.
          */
-
         DEBUGASSERT(clist->path[0]);
-        if(clist->path[0])
-          sep = strchr(clist->path + 1, '/');
-        if(sep)
-          cllen = sep - clist->path;
-        else
-          cllen = strlen(clist->path);
-
-        if(!strncmp(clist->path, co->path, cllen)) {
+        if(pathmatch(clist->path, co->path)) {
           infof(data, "cookie '%s' for domain '%s' dropped, would "
                 "overlay an existing cookie", co->name, co->domain);
           return FALSE;
