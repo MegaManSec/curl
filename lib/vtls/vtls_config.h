@@ -48,9 +48,16 @@ struct ssl_filter_config {
   struct curl_blob *issuercert_blob;
   struct curl_blob *key_blob;
   char *curves;          /* list of curves to use */
+#ifdef USE_ECH
+  char *ech_config;      /* ECHConfigList to use for ECH */
+  char *ech_public;      /* public_name override for ECH */
+#endif
   uint32_t version_max; /* max supported version the client wants to use */
   uint8_t ssl_options;  /* the CURLOPT_SSL_OPTIONS bitmask */
   uint8_t version;    /* what version the client wants to use */
+#ifdef USE_ECH
+  uint8_t tls_ech;    /* the CURLOPT_ECH policy requested */
+#endif
   BIT(verifypeer);       /* set TRUE if this is desired */
   BIT(verifyhost);       /* set TRUE if CN/SAN must match hostname */
   BIT(verifystatus);     /* set TRUE if certificate status must be checked */

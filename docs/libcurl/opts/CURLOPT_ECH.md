@@ -75,6 +75,11 @@ option.
 Using this option multiple times makes the last set string override the
 previous ones. Set it to NULL or "false" to disable its use again.
 
+A connection is only reused for a transfer if the candidate connection was
+set up with the same ECH policy and configuration. This means a transfer
+that requires ECH never reuses a connection that was established without
+it, and vice versa.
+
 # DEFAULT
 
 NULL, meaning ECH is disabled.

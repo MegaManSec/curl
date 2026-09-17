@@ -41,6 +41,10 @@ static CURLcode test_unit3303(const char *arg)
   static char alt_key[]    = "other.key";
   static char alt_ktype[]  = "DER";
   static char alt_ctype[]  = "P12";
+#ifdef USE_ECH
+  static char alt_ech_config[] = "AAAAAA==";
+  uint8_t saved_ech;
+#endif
   struct Curl_peer *origin = NULL;
   struct ssl_filter_config ssl_config;
   struct ssl_filter_config proxy_ssl_config;
@@ -122,6 +126,22 @@ static CURLcode test_unit3303(const char *arg)
   fail_unless(!Curl_ssl_conn_config_match(data, &ssl_config, conn, FALSE),
               "different cert_type must not reuse conn");
   ssl_config.cert_type = saved;
+
+#ifdef USE_ECH
+  /* Requiring ECH must not reuse a conn that was set up without it. */
+  saved_ech = ssl_config.tls_ech;
+  ssl_config.tls_ech = CURLECH_HARD;
+  fail_unless(!Curl_ssl_conn_config_match(data, &ssl_config, conn, FALSE),
+              "different ECH policy must not reuse conn");
+  ssl_config.tls_ech = saved_ech;
+
+  /* Different ECH config must not match. */
+  saved = ssl_config.ech_config;
+  ssl_config.ech_config = alt_ech_config;
+  fail_unless(!Curl_ssl_conn_config_match(data, &ssl_config, conn, FALSE),
+              "different ECH config must not reuse conn");
+  ssl_config.ech_config = saved;
+#endif
 
   /* All fields restored: must match again. */
   fail_unless(Curl_ssl_conn_config_match(data, &ssl_config, conn, FALSE),
