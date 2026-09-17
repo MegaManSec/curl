@@ -631,9 +631,6 @@ static CURLproxycode socks5_req0_init(struct Curl_cfilter *cf,
   if(auth & ~(CURLAUTH_BASIC | CURLAUTH_GSSAPI))
     infof(data, "warning: unsupported value passed to "
           "CURLOPT_SOCKS5_AUTH: %u", auth);
-  if(!(auth & CURLAUTH_BASIC))
-    /* disable username/password auth */
-    Curl_creds_unlink(&sx->creds);
 
   req[0] = 5;   /* version */
   nauths = 1;
@@ -644,7 +641,7 @@ static CURLproxycode socks5_req0_init(struct Curl_cfilter *cf,
     req[1 + nauths] = 1; /* GSS-API */
   }
 #endif
-  if(sx->creds) {
+  if((auth & CURLAUTH_BASIC) && sx->creds) {
     ++nauths;
     req[1 + nauths] = 2; /* username/password */
   }
@@ -1418,5 +1415,36 @@ CURLcode Curl_cf_socks_proxy_insert_after(struct Curl_cfilter *cf_at,
     socks_proxy_ctx_free(ctx);
   return result;
 }
+
+#ifdef UNITTESTS
+/* @unittest 1621 */
+UNITTEST bool socks5_req0_keeps_sasl_service(struct Curl_easy *data,
+                                             struct Curl_creds *creds,
+                                             unsigned char auth);
+UNITTEST bool socks5_req0_keeps_sasl_service(struct Curl_easy *data,
+                                             struct Curl_creds *creds,
+                                             unsigned char auth)
+{
+  struct socks_ctx sx;
+  struct Curl_peer dest;
+  char hostname[] = "proxy.example.com";
+  bool kept;
+
+  memset(&sx, 0, sizeof(sx));
+  memset(&dest, 0, sizeof(dest));
+  dest.hostname = hostname;
+  sx.dest = &dest;
+  Curl_bufq_init(&sx.iobuf, SOCKS_CHUNK_SIZE, SOCKS_CHUNKS);
+  Curl_creds_link(&sx.creds, creds);
+  data->set.socks5auth = auth;
+
+  socks5_req0_init(NULL, &sx, data);
+  kept = Curl_creds_has_sasl_service(sx.creds);
+
+  Curl_creds_unlink(&sx.creds);
+  Curl_bufq_free(&sx.iobuf);
+  return kept;
+}
+#endif /* UNITTESTS */
 
 #endif /* CURL_DISABLE_PROXY */
