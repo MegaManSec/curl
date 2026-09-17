@@ -152,12 +152,18 @@ static char *get_buffer(struct buffer_t *buf, long size)
 
 /*
  * Get buffer address for the given local key.
- * This is always called though `Curl_thread_buffer' and when threads are
- * NOT made available by the os, so no mutex lock/unlock occurs.
+ * This is always called though `Curl_thread_buffer' when pthread-specific
+ * data could not be set up, in which case `locbufs' is shared by all
+ * callers: access to it is serialized using `mutex'.
  */
 static char *buffer_unthreaded(localkey_t key, long size)
 {
-  return get_buffer(locbufs + key, size);
+  char *result;
+
+  pthread_mutex_lock(&mutex);
+  result = get_buffer(locbufs + key, size);
+  pthread_mutex_unlock(&mutex);
+  return result;
 }
 
 /*
@@ -212,8 +218,10 @@ static char *buffer_undef(localkey_t key, long size)
       Curl_thread_buffer = buffer_threaded;
     }
     else {
-      /* No multi-threading available: allocate storage for single-thread
-       * buffer headers. */
+      /* Key creation failed: either threads are not supported by this job,
+       * or thread key resources are exhausted in a multithreaded one. As
+       * these cannot be told apart, fall back to a single set of buffers
+       * shared by all callers and serialized by `mutex'. */
       locbufs = calloc((size_t)LK_LAST, sizeof(*locbufs));
       if(!locbufs) {
         pthread_mutex_unlock(&mutex); /* For symmetry: will probably fail. */
