@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP GET
+multi
+CURLOPT_CLOSESOCKETFUNCTION
+CURLOPT_SHARE
+CURLOPT_MAXAGE_CONN
+</keywords>
+</info>
+
+# Server-side
+<reply>
+<data nocheck="yes">
+HTTP/1.1 200 OK
+Content-Length: 6
+
+hello
+</data>
+</reply>
+
+# Client-side
+<client>
+<server>
+http
+</server>
+<tool>
+lib%TESTNUMBER
+</tool>
+<name>
+reentrant closesocket callback during a cpool scan does not UAF
+</name>
+<command>
+http://%HOSTIP:%HTTPPORT/%TESTNUMBER
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+</verify>
+</testcase>
