@@ -338,7 +338,7 @@ char *curl_easy_escape_ccsid(CURL *handle, const char *string, int length,
   char *d;
   size_t len;
 
-  if(!string)
+  if(!string || (length < 0))
     return NULL;
 
   curlx_dyn_init(&db, MAX_CONV_EXPANSION * CURL_MAX_INPUT_LENGTH);
@@ -366,7 +366,7 @@ char *curl_easy_unescape_ccsid(CURL *handle, const char *string, int length,
   char *d;
   size_t len;
 
-  if(!string)
+  if(!string || (length < 0))
     return NULL;
 
   curlx_dyn_init(&db, MAX_CONV_EXPANSION * CURL_MAX_INPUT_LENGTH);
